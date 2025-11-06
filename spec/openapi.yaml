@@ -1,0 +1,85 @@
+openapi: 3.0.3
+info:
+  title: Order IT Youth API
+  version: 0.1.0
+servers:
+  - url: https://api.example.com
+tags:
+  - name: Products
+  - name: Orders
+paths:
+  /products:
+    get:
+      tags: [Products]
+      summary: List products
+      operationId: getProducts
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+              examples:
+                sample:
+                  value:
+                    - { id: "p1", name: "Áo chiến dịch", price: 120000, image: "/shirt.png" }
+                    - { id: "p2", name: "Sticker", price: 10000, image: "/sticker.png" }
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Create order
+      operationId: postOrders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderInput'
+            examples:
+              sample:
+                value:
+                  items: [{ productId: "p1", qty: 1 }]
+                  method: VIETQR
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+
+components:
+  schemas:
+    Product:
+      type: object
+      required: [id, name, price]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        price: { type: number }
+        image: { type: string }
+    Order:
+      type: object
+      required: [id, status, total, createdAt]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [PENDING, PAID, CANCELLED] }
+        total: { type: number }
+        createdAt: { type: string, format: date-time }
+    CreateOrderInput:
+      type: object
+      required: [items, method]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [productId, qty]
+            properties:
+              productId: { type: string }
+              qty: { type: integer, minimum: 1 }
+        method:
+          type: string
+          enum: [COD, VIETQR]
