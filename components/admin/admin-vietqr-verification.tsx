@@ -135,7 +135,6 @@ export function AdminVietQRVerification() {
       setShowDetailModal(false)
     }
   }
-  }
 
   return (
     <div className="space-y-6">

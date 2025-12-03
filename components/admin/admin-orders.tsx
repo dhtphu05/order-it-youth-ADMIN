@@ -180,8 +180,8 @@ export function AdminOrders() {
     refetch: refetchOrders,
   } = useAdminOrdersControllerList<PaginatedResponse<OrderListItem>>(listParams, {
     query: {
-      keepPreviousData: true,
-      select: (response) => response as PaginatedResponse<OrderListItem>,
+      placeholderData: (previousData) => previousData,
+      select: (response) => response as unknown as PaginatedResponse<OrderListItem>,
     },
   })
 
@@ -212,7 +212,7 @@ export function AdminOrders() {
   } = useAdminOrdersControllerGet<OrderListItem>(selectedOrderCode ?? "", {
     query: {
       enabled: Boolean(selectedOrderCode),
-      select: (response) => response as OrderListItem,
+      select: (response) => response as unknown as OrderListItem,
     },
   })
 

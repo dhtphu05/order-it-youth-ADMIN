@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { LogOut, Home, Package, Users, BarChart3, CreditCard } from "lucide-react"
+import { LogOut, Home, Package, Users, BarChart3, CreditCard, ShoppingBag } from "lucide-react"
 import { AdminOverview } from "./admin-overview"
 import { AdminOrders } from "./admin-orders"
 import { AdminShippers } from "./admin-shippers"
 import { AdminReports } from "./admin-reports"
 import { AdminVietQRVerification } from "./admin-vietqr-verification"
+import { AdminProducts } from "./admin-products"
 
 interface AdminDashboardProps {
   user: {
@@ -19,12 +20,13 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "vietqr" | "shippers" | "reports">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "vietqr" | "products" | "shippers" | "reports">("overview")
 
   const tabs = [
     { id: "overview", label: "Tổng quan", icon: Home },
     { id: "orders", label: "Đơn hàng", icon: Package },
     { id: "vietqr", label: "Xác nhận VietQR", icon: CreditCard },
+    { id: "products", label: "Sản phẩm", icon: ShoppingBag },
     { id: "shippers", label: "Shipper", icon: Users },
     { id: "reports", label: "Báo cáo", icon: BarChart3 },
   ] as const
@@ -80,6 +82,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         {activeTab === "overview" && <AdminOverview />}
         {activeTab === "orders" && <AdminOrders />}
         {activeTab === "vietqr" && <AdminVietQRVerification />}
+        {activeTab === "products" && <AdminProducts />}
         {activeTab === "shippers" && <AdminShippers />}
         {activeTab === "reports" && <AdminReports />}
       </div>
