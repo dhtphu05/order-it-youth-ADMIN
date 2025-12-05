@@ -1,0 +1,43 @@
+name: Build & Deploy FE Admin
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: ghcr.io/${{ secrets.GHCR_USERNAME }}/oiy-fe-admin
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
+      - name: Build & Push Docker image
+        run: |
+          TAG=latest
+          docker build -t $IMAGE_NAME:$TAG .
+          docker push $IMAGE_NAME:$TAG
+
+      - name: Deploy on VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            echo ">>> Pull latest fe-admin image"
+            cd /home/dhtphu05
+            docker compose pull fe-admin
+            docker compose up -d fe-admin
+
+            docker image prune -f
