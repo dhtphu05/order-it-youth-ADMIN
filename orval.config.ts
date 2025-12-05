@@ -8,11 +8,12 @@ const DEFAULT_OPENAPI_URL = `${DEFAULT_BACKEND_URL}/docs-json`;
 
 const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_BACKEND_URL;
 const openapiUrl = process.env.ORVAL_OPENAPI_URL ?? DEFAULT_OPENAPI_URL;
-
+const ORVAL_SPEC_URL =
+  process.env.ORVAL_SPEC_URL || 'http://localhost:4000/docs-json';
 export default defineConfig({
   orderItYouthApi: {
     input: {
-      target: openapiUrl,
+      target: ORVAL_SPEC_URL,
     },
     output: {
       target: './lib/api/generated/endpoints',
