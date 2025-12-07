@@ -10,7 +10,7 @@ interface RoleGuardProps {
     children: ReactNode;
 }
 
-const LOGIN_PATH = '/admin/login';
+const LOGIN_PATH = '/login';
 
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     const router = useRouter();
