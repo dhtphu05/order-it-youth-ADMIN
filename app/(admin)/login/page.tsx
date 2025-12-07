@@ -16,6 +16,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function AdminLoginPage() {
+    console.log('[Login Page] Component Rendering...'); // Added log
     const router = useRouter();
     const login = useLogin();
 
@@ -28,7 +29,9 @@ export default function AdminLoginPage() {
     });
 
     const onSubmit = async (values: FormValues) => {
+        console.log('[Login Page] Submitting form with values:', values);
         try {
+            console.log('[Login Page] Calling login.mutateAsync...');
             await login.mutateAsync({
                 email: values.email,
                 password: values.password,
@@ -42,6 +45,10 @@ export default function AdminLoginPage() {
         }
     };
 
+    const onError = (errors: any) => {
+        console.error('[Login Page] Validation Failed:', errors);
+    };
+
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
             <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-lg ring-1 ring-gray-900/5">
@@ -52,7 +59,7 @@ export default function AdminLoginPage() {
                     </p>
                 </div>
 
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium leading-6 text-gray-900">
                             Email address

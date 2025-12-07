@@ -9,14 +9,13 @@ import {
     getAdminUsersControllerGetOneQueryKey,
 } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
 import type {
-    AdminUsersControllerListParams,
     AdminCreateUserDto,
     AdminUpdateUserDto,
 } from '@/lib/api/generated/models';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function useAdminUsersList(params?: AdminUsersControllerListParams) {
-    return useAdminUsersControllerList(params);
+export function useAdminUsersList() {
+    return useAdminUsersControllerList();
 }
 
 export function useAdminUserDetail(id: string) {
