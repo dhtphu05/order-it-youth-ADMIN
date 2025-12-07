@@ -1,14 +1,34 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import type { UseQueryOptions } from '@tanstack/react-query';
 import {
-    useTeamOrdersControllerGetOrder,
     getTeamOrdersControllerListOrdersQueryKey,
+    teamOrdersControllerGetOrder,
+    teamOrdersControllerListOrders,
+    useTeamOrdersControllerGetOrder,
+    useTeamOrdersControllerListOrders,
 } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
 import { customInstance } from '@/lib/api/custom-instance';
-import type { OrderResponseDto } from '@/lib/api/generated/models';
+import type { OrderItemResponseDto, OrderResponseDto } from '@/lib/api/generated/models';
 
-// Manual definition since generated controller is broken
+export type TeamOrderItem = OrderItemResponseDto & {
+    title_snapshot?: string;
+};
+
+export type TeamOrder = Omit<OrderResponseDto, 'items'> & {
+    items: TeamOrderItem[];
+    created_at?: string;
+    address?: string;
+    note?: string;
+    shipment?: {
+        status?: string;
+        assigned_name?: string;
+        assigned_phone?: string;
+        pickup_eta?: string;
+        delivered_at?: string;
+    };
+};
+
 export type TeamOrdersListParams = {
     page?: number;
     limit?: number;
@@ -20,30 +40,52 @@ export type TeamOrdersListParams = {
 };
 
 export type TeamOrdersListResponse = {
-    data: OrderResponseDto[];
+    data: TeamOrder[];
     total: number;
     page: number;
     limit: number;
 };
 
-// --- List Team Orders (Manual) ---
+type ListQueryOptions = Partial<
+    UseQueryOptions<
+        Awaited<ReturnType<typeof teamOrdersControllerListOrders>>,
+        unknown,
+        TeamOrdersListResponse
+    >
+>;
+
+type DetailQueryOptions = Partial<
+    UseQueryOptions<
+        Awaited<ReturnType<typeof teamOrdersControllerGetOrder>>,
+        unknown,
+        TeamOrder
+    >
+>;
+
 export function useTeamOrdersList(params?: TeamOrdersListParams) {
-    return useQuery({
-        // Use the generated query key base, append params
+    const queryOptions = {
         queryKey: [...getTeamOrdersControllerListOrdersQueryKey(), params],
         queryFn: ({ signal }) =>
             customInstance<TeamOrdersListResponse>({
-                url: '/api/team/orders', // Correct URL based on convention
+                url: '/api/team/orders',
                 method: 'GET',
                 params,
                 signal,
             }),
+    } as ListQueryOptions;
+
+    return useTeamOrdersControllerListOrders<TeamOrdersListResponse>({
+        query: queryOptions,
     });
 }
 
-// --- Get Team Order Detail (Wrapped) ---
 export function useTeamOrderDetail(code: string) {
-    return useTeamOrdersControllerGetOrder(code, {
-        query: { enabled: !!code },
+    const detailQuery = {
+        enabled: Boolean(code),
+        select: (response) => response as unknown as TeamOrder,
+    } as DetailQueryOptions;
+
+    return useTeamOrdersControllerGetOrder<TeamOrder>(code, {
+        query: detailQuery,
     });
 }
