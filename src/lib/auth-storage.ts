@@ -47,3 +47,25 @@ export function clearAuth() {
         // ignore
     }
 }
+
+export function getRedirectPathForRole(role: string): string {
+    switch (role) {
+        case 'ADMIN':
+            return '/admin';
+        case 'STAFF':
+            // Maps to /admin/teams or just /team? Prompt said /team.
+            // Wait, previous tasks implemented /admin/teams.
+            // Prompt says: "STAFF -> /team".
+            // Prompt context says: "Admin Teams page (/admin/teams) is implemented".
+            // But Requirements say: "STAFF -> /team".
+            // I should follow the REQUIREMENT "Step 2: STAFF -> /team".
+            // However, looking at the previous turn, the user might actually mean the existing pages?
+            // "Goal: ... STAFF -> /team ... SHIPPER -> /shipper"
+            // Since I haven't implemented /team or /shipper pages yet, I will strictly follow the prompt instructions for the redirect path strings.
+            return '/team';
+        case 'SHIPPER':
+            return '/shipper';
+        default:
+            return '/admin/login'; // Fallback to login
+    }
+}

@@ -32,7 +32,7 @@ export function ShipperDashboard({ user, onLogout }: ShipperDashboardProps) {
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{user.name}</p>
+              <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
               <p className="text-xs text-gray-600">Shipper</p>
             </div>
             <button

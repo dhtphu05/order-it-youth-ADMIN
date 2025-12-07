@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 
 import { useLogin } from '@/src/lib/hooks/useAuth';
+import { getRedirectPathForRole } from '@/src/lib/auth-storage';
 
 const schema = z.object({
     email: z.string().email('Invalid email address'),
@@ -32,13 +33,19 @@ export default function AdminLoginPage() {
         console.log('[Login Page] Submitting form with values:', values);
         try {
             console.log('[Login Page] Calling login.mutateAsync...');
-            await login.mutateAsync({
+            const loginData = await login.mutateAsync({
                 email: values.email,
                 password: values.password,
             });
 
             toast.success('Logged in successfully');
-            router.push('/admin'); // Redirect to admin dashboard
+            toast.success('Logged in successfully');
+
+            // Redirect based on role
+            const role = (loginData as any).user?.role;
+            const redirectPath = getRedirectPathForRole(role || '');
+            console.log('[Login Page] Redirecting to:', redirectPath);
+            router.push(redirectPath);
         } catch (error) {
             console.error(error);
             toast.error('Login failed. Please check your credentials.');
