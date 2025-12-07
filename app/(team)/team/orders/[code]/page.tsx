@@ -50,6 +50,17 @@ export default function TeamOrderDetailPage() {
                 </div>
             </div>
 
+            <div className="bg-white rounded-lg border shadow-sm p-4 flex flex-col gap-2 text-sm text-gray-700">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="text-gray-500 uppercase text-xs tracking-wide">Referral Code</div>
+                    <div className="font-mono text-sm text-gray-900">{order.referral_code ?? '—'}</div>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="text-gray-500 uppercase text-xs tracking-wide">Team Note</div>
+                    <div className="text-sm text-gray-900">{order.note ?? '—'}</div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-white rounded-lg border shadow-sm p-4">
@@ -95,12 +106,6 @@ export default function TeamOrderDetailPage() {
                             <div>
                                 <div className="text-gray-500">Address</div>
                                 <div className="font-medium">{order.address}</div>
-                            </div>
-                        )}
-                        {order.note && (
-                            <div>
-                                <div className="text-gray-500">Note</div>
-                                <div className="font-medium">{order.note}</div>
                             </div>
                         )}
                     </div>

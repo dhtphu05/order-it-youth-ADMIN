@@ -1,88 +1,131 @@
 'use client';
 
+import { useQueryClient, type QueryKey, type UseQueryOptions } from '@tanstack/react-query';
 import {
-    useAdminOrdersControllerList,
-    useAdminOrdersControllerGet,
-    useAdminOrdersControllerConfirmPayment,
-    useAdminOrdersControllerStartFulfilment,
-    useAdminOrdersControllerFailFulfilment,
-    useAdminOrdersControllerRetryFulfilment,
-    useAdminOrdersControllerCompleteFulfilment,
-    useAdminOrdersControllerCancel,
-    getAdminOrdersControllerListQueryKey,
+    adminOrdersControllerGet,
+    adminOrdersControllerList,
     getAdminOrdersControllerGetQueryKey,
+    getAdminOrdersControllerListQueryKey,
+    useAdminOrdersControllerConfirmPayment,
+    useAdminOrdersControllerGet,
+    useAdminOrdersControllerList,
 } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
+import { customInstance } from '@/lib/api/custom-instance';
 import type {
-    AdminOrdersControllerListParams,
     AdminConfirmPaymentDto,
-    AdminStartFulfilmentDto,
-    AdminFailFulfilmentDto,
-    AdminRetryFulfilmentDto,
-    AdminCompleteFulfilmentDto,
-    AdminCancelOrderDto,
+    AdminOrdersControllerListParams,
+    OrderItemResponseDto,
+    OrderResponseDto,
+    PaymentRecordDto,
 } from '@/lib/api/generated/models';
-import { useQueryClient } from '@tanstack/react-query';
+
+export type AdminOrderItem = OrderItemResponseDto & {
+    title_snapshot?: string;
+};
+
+export type AdminOrder = Omit<OrderResponseDto, 'items'> & {
+    items: AdminOrderItem[];
+    created_at?: string;
+    createdAt?: string;
+    email?: string;
+    address?: string;
+    note?: string;
+    referral_code?: string;
+    payments?: PaymentRecordDto[];
+    shipment?: {
+        status?: string;
+        assigned_name?: string;
+        assigned_phone?: string;
+        pickup_eta?: string;
+        delivered_at?: string;
+    };
+};
+
+export type AdminOrdersListResponse = {
+    data: AdminOrder[];
+    total: number;
+    page: number;
+    limit: number;
+};
+
+type ListQueryOptions = Partial<
+    UseQueryOptions<
+        Awaited<ReturnType<typeof adminOrdersControllerList>>,
+        unknown,
+        AdminOrdersListResponse
+    >
+>;
+
+type DetailQueryOptions = Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof adminOrdersControllerGet>>, unknown, AdminOrder>
+>;
 
 export function useAdminOrdersList(params?: AdminOrdersControllerListParams) {
-    return useAdminOrdersControllerList(params);
-}
+    const queryOptions = {
+        queryKey: getAdminOrdersControllerListQueryKey(params),
+        queryFn: ({ signal }) =>
+            customInstance<AdminOrdersListResponse>({
+                url: '/api/admin/orders',
+                method: 'GET',
+                params,
+                signal,
+            }),
+    } as ListQueryOptions;
 
-export function useAdminOrderDetail(code: string) {
-    return useAdminOrdersControllerGet(code, {
-        query: { enabled: !!code },
+    return useAdminOrdersControllerList<AdminOrdersListResponse>(params, {
+        query: queryOptions,
     });
 }
 
-function useOrderMutation<TDto>(
-    mutationHook: () => any,
-    invalidateList = true,
-    invalidateDetail = true
-) {
+export function useAdminOrderDetail(code: string) {
+    const detailQuery = {
+        enabled: Boolean(code),
+        select: (response) => response as unknown as AdminOrder,
+    } as DetailQueryOptions;
+
+    return useAdminOrdersControllerGet<AdminOrder>(code, {
+        query: detailQuery,
+    });
+}
+
+type ConfirmPaymentInput = {
+    code: string;
+    amountVnd: number;
+    force?: boolean;
+};
+
+export function useAdminConfirmPayment() {
     const queryClient = useQueryClient();
-    const mutation = mutationHook();
+
+    const mutation = useAdminOrdersControllerConfirmPayment({
+        mutation: {
+            onSuccess: async (_data, variables) => {
+                const listKey = getAdminOrdersControllerListQueryKey();
+                await queryClient.invalidateQueries({
+                    queryKey: listKey as unknown as QueryKey,
+                    exact: false,
+                });
+
+                if (variables?.code) {
+                    await queryClient.invalidateQueries({
+                        queryKey: getAdminOrdersControllerGetQueryKey(variables.code) as unknown as QueryKey,
+                    });
+                }
+            },
+        },
+    });
+
+    const confirmPayment = ({ code, amountVnd, force }: ConfirmPaymentInput) => {
+        const payload: AdminConfirmPaymentDto = {
+            amountVnd,
+            force,
+        };
+
+        return mutation.mutateAsync({ code, data: payload });
+    };
 
     return {
         ...mutation,
-        mutateAsync: async (args: { code: string; data: TDto }) => {
-            const result = await mutation.mutateAsync({ code: args.code, data: args.data });
-
-            if (invalidateList) {
-                await queryClient.invalidateQueries({
-                    // @ts-ignore - Generic query key retrieval might be tricky to type perfectly without explicit imported function
-                    queryKey: getAdminOrdersControllerListQueryKey(),
-                });
-            }
-
-            if (invalidateDetail) {
-                await queryClient.invalidateQueries({
-                    queryKey: getAdminOrdersControllerGetQueryKey(args.code),
-                });
-            }
-            return result;
-        },
+        confirmPayment,
     };
-}
-
-export function useAdminOrderConfirmPayment() {
-    return useOrderMutation<AdminConfirmPaymentDto>(useAdminOrdersControllerConfirmPayment);
-}
-
-export function useAdminOrderStartFulfilment() {
-    return useOrderMutation<AdminStartFulfilmentDto>(useAdminOrdersControllerStartFulfilment);
-}
-
-export function useAdminOrderFailFulfilment() {
-    return useOrderMutation<AdminFailFulfilmentDto>(useAdminOrdersControllerFailFulfilment);
-}
-
-export function useAdminOrderRetryFulfilment() {
-    return useOrderMutation<AdminRetryFulfilmentDto>(useAdminOrdersControllerRetryFulfilment);
-}
-
-export function useAdminOrderCompleteFulfilment() {
-    return useOrderMutation<AdminCompleteFulfilmentDto>(useAdminOrdersControllerCompleteFulfilment);
-}
-
-export function useAdminOrderCancel() {
-    return useOrderMutation<AdminCancelOrderDto>(useAdminOrdersControllerCancel);
 }

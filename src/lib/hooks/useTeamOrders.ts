@@ -20,6 +20,7 @@ export type TeamOrder = Omit<OrderResponseDto, 'items'> & {
     created_at?: string;
     address?: string;
     note?: string;
+    referral_code?: string;
     shipment?: {
         status?: string;
         assigned_name?: string;

@@ -107,6 +107,8 @@ export default function TeamOrdersPage() {
                                     <th className="px-4 py-3">Customer</th>
                                     <th className="px-4 py-3">Payment</th>
                                     <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3">Referral</th>
+                                    <th className="px-4 py-3">Note</th>
                                     <th className="px-4 py-3">Total</th>
                                     <th className="px-4 py-3">Created At</th>
                                     <th className="px-4 py-3 text-right">Action</th>
@@ -115,7 +117,7 @@ export default function TeamOrdersPage() {
                             <tbody className="divide-y">
                                 {orders.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                                             No orders found.
                                         </td>
                                     </tr>
@@ -148,6 +150,12 @@ export default function TeamOrdersPage() {
                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 uppercase">
                                                 {order.order_status}
                                             </span>
+                                        </td>
+                                        <td className="px-4 py-3 font-mono text-xs text-gray-700">
+                                            {order.referral_code ?? '—'}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-700 max-w-[200px] truncate">
+                                            {order.note ?? '—'}
                                         </td>
                                         <td className="px-4 py-3 font-medium">
                                             {formatCurrency(order.grand_total_vnd)}

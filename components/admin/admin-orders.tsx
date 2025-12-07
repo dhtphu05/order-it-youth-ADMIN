@@ -28,13 +28,13 @@ import type { OrderResponseDtoPaymentStatus } from "@/lib/api/generated/models/o
 import {
   useAdminOrdersControllerCancel,
   useAdminOrdersControllerCompleteFulfilment,
-  useAdminOrdersControllerConfirmPayment,
   useAdminOrdersControllerFailFulfilment,
   useAdminOrdersControllerGet,
   useAdminOrdersControllerList,
   useAdminOrdersControllerRetryFulfilment,
   useAdminOrdersControllerStartFulfilment,
 } from "@/lib/api/generated/endpoints/orderITYouthAdminAPI"
+import { useAdminConfirmPayment } from "@/src/lib/hooks/useAdminOrders"
 
 const PAGE_SIZE = 10
 
@@ -93,10 +93,102 @@ type OrderListItem = OrderResponseDto & {
   email?: string
   address?: string
   note?: string
+  team_note?: string
+  referral_code?: string
+  team_name?: string
+  owner_team_name?: string
+  assigned_team_name?: string
+  team?: {
+    name?: string
+    display_name?: string
+    code?: string
+  }
+  owner_team?: {
+    name?: string
+    display_name?: string
+    code?: string
+  }
   created_at?: string
   createdAt?: string
   shipperName?: string
   shipper_name?: string
+}
+
+type OrderItem = OrderResponseDto["items"][number]
+
+const readStringField = (source: Record<string, unknown> | undefined, field: string) => {
+  if (!source) return undefined
+  const value = (source as Record<string, unknown>)[field]
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined
+}
+
+const getReferralCode = (order?: Partial<OrderListItem>) => {
+  if (!order) return undefined
+  return (
+    order.referral_code ??
+    readStringField(order, "referralCode") ??
+    readStringField(order, "team_referral_code") ??
+    readStringField(order, "teamReferralCode")
+  )
+}
+
+const getTeamNote = (order?: Partial<OrderListItem>) => {
+  if (!order) return undefined
+  return (
+    order.note ??
+    order.team_note ??
+    readStringField(order, "teamNote") ??
+    readStringField(order, "customer_note") ??
+    readStringField(order, "customerNote")
+  )
+}
+
+const getItemTitle = (item: OrderItem) => {
+  const record = item as Record<string, unknown>
+  return (
+    (record.title_snapshot as string | undefined) ??
+    (record.titleSnapshot as string | undefined) ??
+    (record.product_title as string | undefined) ??
+    (record.productTitle as string | undefined) ??
+    item.title ??
+    "—"
+  )
+}
+
+const getTeamName = (order?: Partial<OrderListItem>) => {
+  if (!order) return undefined
+  const direct =
+    readStringField(order, "team_name") ??
+    readStringField(order, "teamName") ??
+    readStringField(order, "assigned_team_name") ??
+    readStringField(order, "owner_team_name") ??
+    readStringField(order, "ownerTeamName")
+
+  if (direct) {
+    return direct
+  }
+
+  const nestedTeam = order.team ?? order.owner_team
+  if (nestedTeam) {
+    const nested =
+      readStringField(nestedTeam, "display_name") ??
+      readStringField(nestedTeam, "displayName") ??
+      readStringField(nestedTeam, "name")
+    if (nested) {
+      return nested
+    }
+  }
+
+  const referral = getReferralCode(order)
+  if (referral) {
+    const match = referral.match(/team[-_\s]?(\d+)/i)
+    if (match) {
+      return `Team ${match[1]}`
+    }
+    return referral
+  }
+
+  return undefined
 }
 
 type PaginatedResponse<T> = {
@@ -218,8 +310,11 @@ export function AdminOrders() {
 
   const detail = orderDetailData ?? selectedOrderSnapshot
   const detailLoading = isOrderDetailLoading || isOrderDetailFetching
+  const detailReferralCode = getReferralCode(detail ?? undefined)
+  const detailTeamNote = getTeamNote(detail ?? undefined)
+  const detailTeamName = getTeamName(detail ?? undefined)
 
-  const confirmPaymentMutation = useAdminOrdersControllerConfirmPayment()
+  const confirmPaymentMutation = useAdminConfirmPayment()
   const startFulfilmentMutation = useAdminOrdersControllerStartFulfilment()
   const failFulfilmentMutation = useAdminOrdersControllerFailFulfilment()
   const retryFulfilmentMutation = useAdminOrdersControllerRetryFulfilment()
@@ -233,22 +328,24 @@ export function AdminOrders() {
     }
   }
 
-  const handleConfirmPayment = async () => {
-    if (!detail) return
+  const handleConfirmPayment = async (targetOrder?: OrderListItem) => {
+    const order = targetOrder ?? detail
+    if (!order) return
 
-    const defaultAmount = detail.grand_total_vnd?.toString() ?? ""
-    const amountInput = window.prompt("Nhập số tiền đã nhận (VND)", defaultAmount)
-    if (amountInput === null) return
-
-    const amount = Number(amountInput.replace(/[^0-9]/g, ""))
-    if (!amount) {
-      toast({ variant: "destructive", title: "Số tiền không hợp lệ" })
+    const amountLabel = formatCurrency(order.grand_total_vnd)
+    const confirmed = window.confirm(
+      `Bạn chắc chắn đã nhận đủ ${amountLabel} cho đơn ${order.code}?`,
+    )
+    if (!confirmed) {
       return
     }
 
     try {
-      await confirmPaymentMutation.mutateAsync({ code: detail.code, data: { amountVnd: amount } })
-      toast({ title: "Đã xác nhận thanh toán" })
+      await confirmPaymentMutation.confirmPayment({
+        code: order.code,
+        amountVnd: order.grand_total_vnd,
+      })
+      toast({ title: "Xác nhận thanh toán thành công." })
       invalidateOrders()
     } catch (error) {
       toast({
@@ -457,6 +554,7 @@ export function AdminOrders() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Mã đơn</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Khách hàng</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Team</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">SĐT</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Tổng tiền</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Trạng thái</th>
@@ -468,7 +566,7 @@ export function AdminOrders() {
             <tbody className="divide-y divide-gray-200">
               {isLoading && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-500">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-cyan-600" />
                       Đang tải danh sách đơn hàng...
@@ -479,7 +577,7 @@ export function AdminOrders() {
 
               {isError && !isLoading && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-6 text-center text-sm text-red-600">
+                  <td colSpan={9} className="px-6 py-6 text-center text-sm text-red-600">
                     Không thể tải danh sách đơn hàng: {getErrorMessage(ordersError)}
                   </td>
                 </tr>
@@ -487,7 +585,7 @@ export function AdminOrders() {
 
               {!isLoading && !isError && orders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-6 text-center text-sm text-gray-500">
+                  <td colSpan={9} className="px-6 py-6 text-center text-sm text-gray-500">
                     Chưa có đơn hàng nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -496,12 +594,14 @@ export function AdminOrders() {
               {!isLoading && !isError &&
                 orders.map((order) => {
                   const shipper = order.shipperName ?? order.shipper_name
+                  const teamName = getTeamName(order)
                   const createdAt = order.created_at ?? order.createdAt ?? order.fulfilled_at ?? order.cancelled_at
 
                   return (
                     <tr key={order.code} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{order.code}</td>
                       <td className="px-6 py-4 text-sm text-gray-700">{order.full_name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-700">{teamName ?? "—"}</td>
                       <td className="px-6 py-4 text-sm text-gray-700">{order.phone}</td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatCurrency(order.grand_total_vnd)}</td>
                       <td className="px-6 py-4">
@@ -512,6 +612,15 @@ export function AdminOrders() {
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${PAYMENT_STATUS_BADGES[order.payment_status]}`}>
                             {PAYMENT_STATUS_LABELS[order.payment_status]}
                           </span>
+                          {order.payment_status === PaymentStatusEnum.PENDING && order.payment_method === "VIETQR" && (
+                            <button
+                              onClick={() => handleConfirmPayment(order)}
+                              disabled={confirmPaymentMutation.isPending}
+                              className="mt-1 px-3 py-1 text-xs font-medium rounded-md border border-cyan-500 text-cyan-600 hover:bg-cyan-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {confirmPaymentMutation.isPending ? "Đang xác nhận..." : "Xác nhận thanh toán"}
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
@@ -597,6 +706,15 @@ export function AdminOrders() {
                       <p className="text-gray-700">SĐT: {detail.phone}</p>
                       <p className="text-gray-700">Email: {detail.email ?? "—"}</p>
                       <p className="text-gray-700">Địa chỉ: {detail.address ?? "—"}</p>
+                      <p className="text-gray-700">
+                        Referral code: <span className="font-mono">{detailReferralCode ?? "—"}</span>
+                      </p>
+                      <p className="text-gray-700">
+                        Thuộc team: <span className="font-medium">{detailTeamName ?? "—"}</span>
+                      </p>
+                      <p className="text-gray-700">
+                        Ghi chú đội: <span className="font-medium">{detailTeamNote ?? "—"}</span>
+                      </p>
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="text-gray-500">Thông tin thanh toán</p>
@@ -648,14 +766,19 @@ export function AdminOrders() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {detail.items?.map((item) => (
-                            <tr key={`${item.title}-${item.variant_id ?? item.combo_id}`}>
-                              <td className="px-4 py-2 text-gray-900">{item.title}</td>
+                          {detail.items?.map((item) => {
+                            const resolvedTitle = getItemTitle(item)
+                            const key = item.variant_id ?? item.combo_id ?? resolvedTitle
+
+                            return (
+                              <tr key={`${key}`}>
+                                <td className="px-4 py-2 text-gray-900">{resolvedTitle}</td>
                               <td className="px-4 py-2 text-gray-700">{item.quantity}</td>
                               <td className="px-4 py-2 text-gray-700">{formatCurrency(item.unit_price_vnd)}</td>
                               <td className="px-4 py-2 text-gray-900 font-medium">{formatCurrency(item.line_total_vnd)}</td>
-                            </tr>
-                          ))}
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
