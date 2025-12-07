@@ -5,12 +5,12 @@ import {
     useAdminTeamsControllerGet,
     useAdminTeamsControllerCreate,
     useAdminTeamsControllerUpdate,
-    useAdminTeamsControllerDisable,
     useAdminTeamsControllerAddMember,
     useAdminTeamsControllerRemoveMember,
     getAdminTeamsControllerListQueryKey,
     getAdminTeamsControllerGetQueryKey,
 } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
+
 import type {
     AdminTeamsControllerListParams,
     AdminCreateTeamDto,
@@ -19,16 +19,19 @@ import type {
 } from '@/lib/api/generated/models';
 import { useQueryClient } from '@tanstack/react-query';
 
+// --- List Teams ---
 export function useAdminTeamsList(params?: AdminTeamsControllerListParams) {
     return useAdminTeamsControllerList(params);
 }
 
+// --- Team Detail ---
 export function useAdminTeamDetail(id: string) {
     return useAdminTeamsControllerGet(id, {
         query: { enabled: !!id },
     });
 }
 
+// --- Create Team ---
 export function useCreateAdminTeam() {
     const queryClient = useQueryClient();
     const mutation = useAdminTeamsControllerCreate();
@@ -37,6 +40,7 @@ export function useCreateAdminTeam() {
         ...mutation,
         mutateAsync: async (data: AdminCreateTeamDto) => {
             const result = await mutation.mutateAsync({ data });
+            // Invalidate list
             await queryClient.invalidateQueries({
                 queryKey: getAdminTeamsControllerListQueryKey(),
             });
@@ -45,6 +49,7 @@ export function useCreateAdminTeam() {
     };
 }
 
+// --- Update Team ---
 export function useUpdateAdminTeam() {
     const queryClient = useQueryClient();
     const mutation = useAdminTeamsControllerUpdate();
@@ -53,6 +58,7 @@ export function useUpdateAdminTeam() {
         ...mutation,
         mutateAsync: async (args: { id: string; data: AdminUpdateTeamDto }) => {
             const result = await mutation.mutateAsync({ id: args.id, data: args.data });
+            // Invalidate list and detail
             await queryClient.invalidateQueries({
                 queryKey: getAdminTeamsControllerListQueryKey(),
             });
@@ -64,26 +70,8 @@ export function useUpdateAdminTeam() {
     };
 }
 
-export function useDisableAdminTeam() {
-    const queryClient = useQueryClient();
-    const mutation = useAdminTeamsControllerDisable();
-
-    return {
-        ...mutation,
-        mutateAsync: async (id: string) => {
-            const result = await mutation.mutateAsync({ id });
-            await queryClient.invalidateQueries({
-                queryKey: getAdminTeamsControllerListQueryKey(),
-            });
-            await queryClient.invalidateQueries({
-                queryKey: getAdminTeamsControllerGetQueryKey(id),
-            });
-            return result;
-        },
-    };
-}
-
-export function useAddMemberToTeam() {
+// --- Add Member ---
+export function useAddTeamMember() {
     const queryClient = useQueryClient();
     const mutation = useAdminTeamsControllerAddMember();
 
@@ -91,6 +79,7 @@ export function useAddMemberToTeam() {
         ...mutation,
         mutateAsync: async (args: { id: string; data: AdminAddTeamMemberDto }) => {
             const result = await mutation.mutateAsync({ id: args.id, data: args.data });
+            // Invalidate detail to show new member
             await queryClient.invalidateQueries({
                 queryKey: getAdminTeamsControllerGetQueryKey(args.id),
             });
@@ -99,7 +88,8 @@ export function useAddMemberToTeam() {
     };
 }
 
-export function useRemoveMemberFromTeam() {
+// --- Remove Member ---
+export function useRemoveTeamMember() {
     const queryClient = useQueryClient();
     const mutation = useAdminTeamsControllerRemoveMember();
 
@@ -107,6 +97,7 @@ export function useRemoveMemberFromTeam() {
         ...mutation,
         mutateAsync: async (args: { id: string; memberId: string }) => {
             const result = await mutation.mutateAsync({ id: args.id, memberId: args.memberId });
+            // Invalidate detail to remove member from list
             await queryClient.invalidateQueries({
                 queryKey: getAdminTeamsControllerGetQueryKey(args.id),
             });
