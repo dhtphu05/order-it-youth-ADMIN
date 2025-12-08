@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
 import {
     Bar,
     CartesianGrid,
@@ -63,9 +62,14 @@ export default function TeamOrdersPage() {
     const limit = listQuery.data?.limit ?? PAGE_SIZE;
     const hasNextPage = page * limit < total;
     const statsLoading = statsQuery.isLoading || statsQuery.isFetching;
-    const timelineData = statsQuery.timeline;
-    const shipmentSummary = statsQuery.shipments;
     const overview = statsQuery.overview;
+    const teamBreakdown = statsQuery.teamBreakdown ?? [];
+    const statusBreakdown = statsQuery.statusBreakdown ?? [];
+    const chartData = teamBreakdown.map((team) => ({
+        name: team.name,
+        revenue: team.totalRevenue,
+        orders: team.totalOrders,
+    }));
     const successRateValue = Number.isFinite(overview.successRate) ? overview.successRate : 0;
     const statsCards = [
         {
@@ -93,14 +97,6 @@ export default function TeamOrdersPage() {
             value: formatCurrency(Math.round(overview.averageOrderValue)),
         },
     ];
-    const shipmentEntries = [
-        { label: 'Tổng chuyến', value: shipmentSummary.total },
-        { label: 'Đang giao', value: shipmentSummary.inProgress },
-        { label: 'Đang chờ xử lý', value: shipmentSummary.pending },
-        { label: 'Đã giao thành công', value: shipmentSummary.delivered },
-        { label: 'Thất bại', value: shipmentSummary.failed },
-    ];
-
     return (
         <div className="space-y-6 p-6">
             <div className="flex items-center justify-between">
@@ -144,26 +140,22 @@ export default function TeamOrdersPage() {
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Đơn & doanh thu theo ngày</h3>
-                            <p className="text-sm text-gray-500">Hiển thị đơn hàng và doanh thu hàng ngày.</p>
+                            <h3 className="text-lg font-semibold text-gray-900">Hiệu suất theo team</h3>
+                            <p className="text-sm text-gray-500">Doanh thu và số đơn của từng team trong khoảng thời gian.</p>
                         </div>
                     </div>
                     {statsLoading ? (
                         <div className="h-64 flex items-center justify-center text-gray-500 text-sm">Đang tải dữ liệu...</div>
-                    ) : timelineData.length === 0 ? (
+                    ) : chartData.length === 0 ? (
                         <div className="h-64 flex items-center justify-center text-gray-500 text-sm">
                             Không có dữ liệu trong khoảng thời gian này.
                         </div>
                     ) : (
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={timelineData}>
+                                <ComposedChart data={chartData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                    <XAxis
-                                        dataKey="date"
-                                        tickFormatter={(value) => format(new Date(value), 'dd/MM')}
-                                        stroke="#6b7280"
-                                    />
+                                    <XAxis dataKey="name" stroke="#6b7280" />
                                     <YAxis
                                         yAxisId="left"
                                         stroke="#6b7280"
@@ -178,7 +170,7 @@ export default function TeamOrdersPage() {
                                         tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
                                     />
                                     <Tooltip
-                                        labelFormatter={(value) => format(new Date(value), 'dd/MM/yyyy')}
+                                        labelFormatter={(value) => value}
                                         formatter={(value, name) => {
                                             if (name === 'orders') {
                                                 return [`${Number(value).toLocaleString('vi-VN')} đơn`, 'Đơn hàng'];
@@ -210,21 +202,25 @@ export default function TeamOrdersPage() {
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Trạng thái giao nhận</h3>
-                            <p className="text-sm text-gray-500">Tổng quan tình trạng các chuyến giao hàng.</p>
+                            <h3 className="text-lg font-semibold text-gray-900">Trạng thái đơn hàng</h3>
+                            <p className="text-sm text-gray-500">Phân bổ đơn hàng theo trạng thái.</p>
                         </div>
                     </div>
                     {statsLoading ? (
                         <div className="h-64 flex items-center justify-center text-gray-500 text-sm">Đang tải dữ liệu...</div>
+                    ) : statusBreakdown.length === 0 ? (
+                        <div className="h-64 flex items-center justify-center text-gray-500 text-sm">
+                            Không có dữ liệu trạng thái.
+                        </div>
                     ) : (
                         <div className="space-y-4">
-                            {shipmentEntries.map((entry) => (
-                                <div key={entry.label} className="flex items-center justify-between">
+                            {statusBreakdown.map((entry) => (
+                                <div key={entry.status} className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-700">{entry.label}</p>
+                                        <p className="text-sm font-medium text-gray-700">{entry.status}</p>
                                     </div>
                                     <p className="text-base font-semibold text-gray-900">
-                                        {entry.value.toLocaleString('vi-VN')}
+                                        {entry.count.toLocaleString('vi-VN')}
                                     </p>
                                 </div>
                             ))}

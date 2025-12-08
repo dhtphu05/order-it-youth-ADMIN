@@ -192,6 +192,9 @@ const getTeamName = (order?: Partial<OrderListItem>) => {
   return undefined
 }
 
+const getOrderId = (order?: Partial<OrderListItem>) =>
+  readStringField(order, "id") ?? readStringField(order, "_id") ?? order?.code
+
 const canDeleteOrder = (status?: OrderResponseDtoOrderStatus) => {
   if (!status) return false
   return DELETABLE_STATUSES.includes(status)
@@ -477,7 +480,7 @@ export function AdminOrders() {
     if (!confirmDelete(detail.code)) return
 
     try {
-      await deleteOrderMutation.deleteOrder({ code: detail.code })
+      await deleteOrderMutation.deleteOrder({ code: detail.code, id: getOrderId(detail) })
       toast({ title: "Đã xoá đơn hàng" })
       invalidateOrders()
       setShowDetailModal(false)
@@ -496,7 +499,7 @@ export function AdminOrders() {
     if (!confirmDelete(order.code)) return
 
     try {
-      await deleteOrderMutation.deleteOrder({ code: order.code })
+      await deleteOrderMutation.deleteOrder({ code: order.code, id: getOrderId(order) })
       toast({ title: "Đã xoá đơn hàng" })
       invalidateOrders()
     } catch (error) {

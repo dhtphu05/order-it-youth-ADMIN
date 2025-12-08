@@ -18,7 +18,7 @@ export function useCurrentUser() {
     const logout = () => {
         clearAuth();
         setUser(null);
-        router.push('/admin/login');
+        router.push('/login');
     };
 
     return { user, isReady, logout };

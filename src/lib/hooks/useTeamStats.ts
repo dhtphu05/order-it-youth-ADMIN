@@ -1,384 +1,111 @@
 'use client';
 
-import {
-    useTeamStatisticsControllerGetMyTeamShipmentStats,
-    useTeamStatisticsControllerGetMyTeamStats,
-} from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
+import { useMemo } from 'react';
+import { useTeamStatisticsControllerGetMyTeamStats } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
 
 export type TeamStatsParams = {
     from: string;
     to: string;
 };
 
-type TimelinePoint = {
-    date: string;
-    revenue: number;
-    orders: number;
-};
-
-type ShipmentSummary = {
-    total: number;
-    assigned: number;
-    inProgress: number;
-    delivered: number;
-    failed: number;
-    pending: number;
-};
-
-const DATA_ENVELOPE_KEYS = ['data', 'result', 'payload', 'response', 'value', 'content'] as const;
-const ARRAY_ENVELOPE_KEYS = [...DATA_ENVELOPE_KEYS, 'items', 'rows', 'values', 'list'] as const;
-
-const isRecord = (value: unknown): value is Record<string, any> =>
-    typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const unwrapDataObject = (value: unknown): Record<string, any> => {
-    if (!isRecord(value)) {
-        return {};
-    }
-
-    for (const key of DATA_ENVELOPE_KEYS) {
-        if (isRecord(value[key])) {
-            return unwrapDataObject(value[key]);
-        }
-    }
-
-    return value;
-};
-
-const unwrapArrayValue = (value: unknown): any[] | undefined => {
-    if (Array.isArray(value)) {
-        return value;
-    }
-
-    if (isRecord(value)) {
-        for (const key of ARRAY_ENVELOPE_KEYS) {
-            const candidate = value[key];
-            const unwrapped = unwrapArrayValue(candidate);
-            if (unwrapped !== undefined) {
-                return unwrapped;
-            }
-        }
-    }
-
-    return undefined;
-};
-
-const pickNumber = (...values: Array<number | string | null | undefined>) => {
-    for (const value of values) {
-        if (typeof value === 'number' && !Number.isNaN(value)) {
-            return value;
-        }
-        if (typeof value === 'string') {
-            const parsed = Number(value);
-            if (!Number.isNaN(parsed)) {
-                return parsed;
-            }
-        }
-    }
-    return 0;
-};
-
-const firstString = (...values: Array<string | null | undefined>) => {
-    for (const value of values) {
-        if (typeof value === 'string' && value.trim().length > 0) {
-            return value;
-        }
-    }
-    return undefined;
-};
-
-const pickRecord = (...values: unknown[]): Record<string, any> | undefined => {
-    for (const value of values) {
-        if (isRecord(value)) {
-            return value;
-        }
-    }
-    return undefined;
-};
-
-const pickArray = (...values: unknown[]): any[] | undefined => {
-    for (const value of values) {
-        const arr = unwrapArrayValue(value);
-        if (arr !== undefined) {
-            return arr;
-        }
-    }
-    return undefined;
-};
-
-const mapRevenuePoints = (input?: any[]): TimelinePoint[] => {
-    if (!Array.isArray(input)) {
-        return [];
-    }
-
-    return input
-        .map((item) => ({
-            date:
-                firstString(
-                    item.date,
-                    item.day,
-                    item.label,
-                    item.period,
-                    item.timestamp,
-                    item.time,
-                    item.bucket,
-                    item.key,
-                ) ?? new Date().toISOString(),
-            revenue: pickNumber(
-                item.revenue,
-                item.revenue_vnd,
-                item.total_revenue_vnd,
-                item.amount,
-                item.amount_vnd,
-                item.total_amount,
-                item.total_amount_vnd,
-                item.value,
-            ),
-            orders: pickNumber(
-                item.orders,
-                item.total_orders,
-                item.count,
-                item.order_count,
-                item.orders_count,
-                item.totalOrders,
-            ),
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-};
-
-const mapOrderPoints = (input?: any[]): TimelinePoint[] => {
-    if (!Array.isArray(input)) {
-        return [];
-    }
-
-    return input
-        .map((item) => ({
-            date:
-                firstString(
-                    item.date,
-                    item.day,
-                    item.label,
-                    item.period,
-                    item.timestamp,
-                    item.time,
-                    item.bucket,
-                    item.key,
-                ) ?? new Date().toISOString(),
-            revenue: 0,
-            orders: pickNumber(
-                item.orders,
-                item.total_orders,
-                item.count,
-                item.order_count,
-                item.orders_count,
-                item.totalOrders,
-                item.totalOrdersCount,
-                item.total_orders_count,
-                item.value,
-            ),
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-};
-
-const mergeTimelinePoints = (revenuePoints: TimelinePoint[], orderPoints: TimelinePoint[]): TimelinePoint[] => {
-    const map = new Map<string, TimelinePoint>();
-
-    const ensureEntry = (date: string) => {
-        let entry = map.get(date);
-        if (!entry) {
-            entry = { date, revenue: 0, orders: 0 };
-            map.set(date, entry);
-        }
-        return entry;
+export interface TeamStatsResponse {
+    period?: {
+        from?: string;
+        to?: string;
     };
+    teams: TeamStatItem[];
+}
 
-    for (const point of revenuePoints) {
-        const entry = ensureEntry(point.date);
-        entry.revenue = point.revenue;
-        entry.orders = point.orders;
+export interface TeamStatItem {
+    team: {
+        id: string;
+        code: string;
+        name: string;
+    };
+    total_revenue_vnd: number;
+    total_orders: number;
+    orders_by_status: Record<string, number>;
+}
+
+type StatusEntry = {
+    status: string;
+    count: number;
+};
+
+const SUCCESS_STATUSES = ['SUCCESS', 'COMPLETED', 'DELIVERED'];
+const FAILURE_STATUSES = ['FAILED', 'CANCELLED', 'REFUNDED'];
+
+const sumStatuses = (map: Record<string, number>, statuses: string[]) => {
+    let total = 0;
+    for (const key of statuses) {
+        const normalized = key.toUpperCase();
+        total += map[normalized] ?? map[key] ?? 0;
     }
-
-    for (const point of orderPoints) {
-        const entry = ensureEntry(point.date);
-        entry.orders = point.orders;
-    }
-
-    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+    return total;
 };
 
 export function useTeamStats(params: TeamStatsParams) {
-    const queryOptions = {
+    const statsQuery = useTeamStatisticsControllerGetMyTeamStats<TeamStatsResponse>(params, {
         query: {
             keepPreviousData: true,
         },
-    };
+    });
 
-    const statsQuery = useTeamStatisticsControllerGetMyTeamStats<any>(params, queryOptions);
-    const shipmentQuery = useTeamStatisticsControllerGetMyTeamShipmentStats<any>(params, queryOptions);
+    const teams = Array.isArray(statsQuery.data?.teams) ? statsQuery.data?.teams ?? [] : [];
 
-    const statsData = unwrapDataObject(statsQuery.data);
-    const summarySource =
-        pickRecord(
-            statsData.overview,
-            statsData.summary,
-            statsData.metrics,
-            statsData.stats,
-            statsData.statistics,
-            statsData.totals,
-            statsData.meta,
-        ) ?? statsData;
+    const statusTotals = useMemo(() => {
+        const totals: Record<string, number> = {};
+        for (const team of teams) {
+            Object.entries(team.orders_by_status ?? {}).forEach(([status, count]) => {
+                const key = status?.toUpperCase?.() ?? 'UNKNOWN';
+                totals[key] = (totals[key] ?? 0) + (typeof count === 'number' ? count : 0);
+            });
+        }
+        return totals;
+    }, [teams]);
 
-    const revenueSeries =
-        pickArray(
-            statsData.revenueByDay,
-            statsData.revenue_by_day,
-            statsData.dailyRevenue,
-            statsData.daily_revenue,
-            statsData.revenueTrend,
-            statsData.revenue_trend,
-            statsData.revenueSeries,
-            statsData.revenue_series,
-            statsData.timeline,
-            statsData.revenuePoints,
-            statsData.revenue_points,
-            statsData.series?.revenue,
-            statsData.series?.revenues,
-        ) ?? [];
-
-    const orderSeries =
-        pickArray(
-            statsData.ordersByDay,
-            statsData.orders_by_day,
-            statsData.dailyOrders,
-            statsData.daily_orders,
-            statsData.orderTrend,
-            statsData.order_trend,
-            statsData.ordersTrend,
-            statsData.orders_trend,
-            statsData.orderSeries,
-            statsData.order_series,
-            statsData.ordersSeries,
-            statsData.orders_series,
-            statsData.timeline,
-            statsData.ordersPoints,
-            statsData.orders_points,
-            statsData.series?.orders,
-        ) ?? [];
-
-    const revenuePoints = mapRevenuePoints(revenueSeries);
-    const orderPoints = mapOrderPoints(orderSeries);
-    const timeline = mergeTimelinePoints(revenuePoints, orderPoints);
+    const totalOrders = teams.reduce((sum, team) => sum + (team.total_orders ?? 0), 0);
+    const totalRevenue = teams.reduce((sum, team) => sum + (team.total_revenue_vnd ?? 0), 0);
+    const successOrders = sumStatuses(statusTotals, SUCCESS_STATUSES);
+    const failedOrders = sumStatuses(statusTotals, FAILURE_STATUSES);
+    const pendingOrders = Math.max(totalOrders - successOrders - failedOrders, 0);
 
     const overview = {
-        totalOrders: pickNumber(
-            summarySource.totalOrders,
-            summarySource.total_orders,
-            summarySource.orders,
-            summarySource.orderCount,
-        ),
-        totalRevenue: pickNumber(
-            summarySource.totalRevenue,
-            summarySource.total_revenue,
-            summarySource.totalRevenueVnd,
-            summarySource.total_revenue_vnd,
-            summarySource.revenue,
-            summarySource.revenue_vnd,
-        ),
-        averageOrderValue: pickNumber(
-            summarySource.averageOrderValue,
-            summarySource.average_order_value,
-            summarySource.averageOrderValueVnd,
-            summarySource.average_order_value_vnd,
-            summarySource.avgOrderValue,
-            summarySource.avg_order_value,
-        ),
-        completedOrders: pickNumber(
-            summarySource.completedOrders,
-            summarySource.completed,
-            summarySource.successfulOrders,
-            summarySource.deliveredOrders,
-            summarySource.fulfilledOrders,
-            summarySource.success_orders,
-        ),
-        pendingOrders: pickNumber(
-            summarySource.pendingOrders,
-            summarySource.pending,
-            summarySource.processingOrders,
-            summarySource.openOrders,
-            summarySource.inProgressOrders,
-        ),
-        successRate: pickNumber(
-            summarySource.successRate,
-            summarySource.success_rate,
-            summarySource.completionRate,
-            summarySource.completion_rate,
-            summarySource.conversionRate,
-            summarySource.conversion_rate,
-        ),
+        totalOrders,
+        totalRevenue,
+        averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+        completedOrders: successOrders,
+        pendingOrders,
+        successRate: totalOrders > 0 ? (successOrders / totalOrders) * 100 : 0,
     };
 
-    const shipmentsData = unwrapDataObject(shipmentQuery.data);
-    const shipmentsSource =
-        pickRecord(
-            shipmentsData.overview,
-            shipmentsData.summary,
-            shipmentsData.metrics,
-            shipmentsData.stats,
-            shipmentsData.statuses,
-            shipmentsData.state,
-        ) ?? shipmentsData;
+    const teamBreakdown = teams.map((team) => ({
+        id: team.team?.id ?? team.team?.code ?? team.team?.name ?? Math.random().toString(36),
+        code: team.team?.code ?? 'N/A',
+        name: team.team?.name ?? 'Không rõ',
+        totalRevenue: team.total_revenue_vnd ?? 0,
+        totalOrders: team.total_orders ?? 0,
+        ordersByStatus: Object.fromEntries(
+            Object.entries(team.orders_by_status ?? {}).map(([status, count]) => [
+                status?.toUpperCase?.() ?? status,
+                count,
+            ]),
+        ),
+    }));
 
-    const shipments: ShipmentSummary = {
-        total: pickNumber(
-            shipmentsSource.totalShipments,
-            shipmentsSource.total,
-            shipmentsSource.shipments,
-            shipmentsSource.count,
-        ),
-        assigned: pickNumber(
-            shipmentsSource.assigned,
-            shipmentsSource.assignedShipments,
-            shipmentsSource.assigned_count,
-            shipmentsSource.assigned_shipments,
-        ),
-        inProgress: pickNumber(
-            shipmentsSource.inProgress,
-            shipmentsSource.in_progress,
-            shipmentsSource.inTransit,
-            shipmentsSource.in_transit,
-            shipmentsSource.active,
-        ),
-        delivered: pickNumber(
-            shipmentsSource.delivered,
-            shipmentsSource.completed,
-            shipmentsSource.successful,
-            shipmentsSource.deliveredShipments,
-            shipmentsSource.delivered_count,
-        ),
-        failed: pickNumber(
-            shipmentsSource.failed,
-            shipmentsSource.failedShipments,
-            shipmentsSource.unsuccessful,
-            shipmentsSource.failed_count,
-        ),
-        pending: pickNumber(
-            shipmentsSource.pending,
-            shipmentsSource.waiting,
-            shipmentsSource.queued,
-            shipmentsSource.pendingShipments,
-        ),
-    };
+    const statusBreakdown: StatusEntry[] = Object.entries(statusTotals)
+        .map(([status, count]) => ({ status, count }))
+        .sort((a, b) => b.count - a.count);
 
     return {
         overview,
-        timeline,
-        shipments,
-        isLoading: statsQuery.isLoading || shipmentQuery.isLoading,
-        isFetching: statsQuery.isFetching || shipmentQuery.isFetching,
-        isError: statsQuery.isError || shipmentQuery.isError,
-        error: statsQuery.error ?? shipmentQuery.error,
-        refetch: async () => {
-            await Promise.all([statsQuery.refetch(), shipmentQuery.refetch()]);
-        },
+        teamBreakdown,
+        statusBreakdown,
+        period: statsQuery.data?.period,
+        isLoading: statsQuery.isLoading,
+        isFetching: statsQuery.isFetching,
+        isError: statsQuery.isError,
+        error: statsQuery.error,
+        refetch: statsQuery.refetch,
     };
 }

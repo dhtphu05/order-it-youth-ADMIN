@@ -1,8 +1,12 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { useTeamOrderDetail } from '@/src/lib/hooks/useTeamOrders';
+import { toast } from '@/components/ui/use-toast';
+import { useTeamOrderDetail, type TeamOrder } from '@/src/lib/hooks/useTeamOrders';
+import { useTeamMembers } from '@/src/lib/hooks/useTeamMembers';
+import { useAssignShipmentToMember } from '@/src/lib/hooks/useTeamShipments';
 
 const formatCurrency = (value?: number) => {
     if (typeof value !== 'number') {
@@ -19,12 +23,71 @@ const formatDateTime = (value?: string) => {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN');
 };
 
+const getErrorMessage = (error: unknown) => {
+    if (!error) {
+        return 'Đã có lỗi xảy ra.';
+    }
+    if (error instanceof Error) {
+        return error.message;
+    }
+    if (typeof error === 'string') {
+        return error;
+    }
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return 'Đã có lỗi xảy ra.';
+    }
+};
+
+const getFirstString = (...values: Array<string | null | undefined>) => {
+    for (const value of values) {
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return undefined;
+};
+
+const getTeamIdFromOrder = (order?: TeamOrder) => {
+    if (!order) return undefined;
+    const nestedTeam =
+        (order as any).team ??
+        (order as any).assigned_team ??
+        (order as any).owner_team ??
+        (order as any).ownerTeam;
+    const nestedId = typeof nestedTeam === 'object' ? nestedTeam?.id : undefined;
+    const fallbackId =
+        (order as any).team_id ??
+        (order as any).teamId ??
+        (order as any).owner_team_id ??
+        (order as any).ownerTeamId;
+    const resolved = nestedId ?? fallbackId;
+    return typeof resolved === 'string' ? resolved : resolved ? String(resolved) : undefined;
+};
+
 export default function TeamOrderDetailPage() {
     const params = useParams();
     const router = useRouter();
     const code = params?.code as string;
 
     const orderQuery = useTeamOrderDetail(code);
+    const assignShipment = useAssignShipmentToMember();
+
+    const order = orderQuery.data;
+    const teamId = getTeamIdFromOrder(order);
+    const membersQuery = useTeamMembers(teamId);
+    const shipperMembers = useMemo(
+        () =>
+            (membersQuery.members ?? []).filter((member) =>
+                (member.role ?? '').toUpperCase().includes('SHIPPER'),
+            ),
+        [membersQuery.members],
+    );
+    const [selectedMemberId, setSelectedMemberId] = useState('');
+    useEffect(() => {
+        setSelectedMemberId('');
+    }, [code]);
 
     if (orderQuery.isLoading) {
         return <div className="p-8 text-center text-gray-500">Loading order...</div>;
@@ -34,7 +97,79 @@ export default function TeamOrderDetailPage() {
         return <div className="p-8 text-center text-red-500">Failed to load order.</div>;
     }
 
-    const order = orderQuery.data;
+    const assignedMemberId = getFirstString(
+        (order as any).assigned_member_id,
+        (order as any).assignedMemberId,
+        order.shipment?.assigned_member_id,
+        order.shipment?.assignedMemberId,
+        (order as any).assigned_user_id,
+        (order as any).assignedUserId,
+        (order as any).shipper_id,
+        (order as any).shipperId,
+    );
+    const currentAssigneeName = getFirstString(
+        order.shipment?.assigned_name,
+        (order as any).assigned_name,
+        (order as any).assignedName,
+        (order as any).shipperName,
+        (order as any).shipper_name,
+        (order as any).assigned_shipper_name,
+        (order as any).assignedTeamName,
+    );
+    const currentAssigneePhone = getFirstString(
+        order.shipment?.assigned_phone,
+        (order as any).assigned_phone,
+        (order as any).assignedPhone,
+        (order as any).shipperPhone,
+        (order as any).shipper_phone,
+    );
+    const matchedAssignee = shipperMembers.find(
+        (member) =>
+            member.id === assignedMemberId ||
+            member.userId === assignedMemberId ||
+            member.id === (order as any).assigned_user_id ||
+            member.userId === (order as any).assigned_user_id,
+    );
+
+    const isAssigned = Boolean(currentAssigneeName || currentAssigneePhone);
+    const handleAssignShipper = async () => {
+        if (!order) return;
+        if (!selectedMemberId) {
+            toast({
+                variant: 'destructive',
+                title: 'Vui lòng chọn shipper',
+                description: 'Bạn cần chọn một shipper trước khi gán đơn.',
+            });
+            return;
+        }
+
+        const selected = shipperMembers.find((member) => member.id === selectedMemberId);
+        if (!selected) {
+            toast({
+                variant: 'destructive',
+                title: 'Shipper không hợp lệ',
+                description: 'Không tìm thấy thông tin shipper đã chọn.',
+            });
+            return;
+        }
+
+        try {
+            await assignShipment.assign({
+                code: order.code,
+                memberId: selected.id,
+                userId: selected.userId ?? selected.id,
+            });
+            toast({ title: 'Đã gán shipper cho đơn hàng thành công.' });
+            setSelectedMemberId('');
+            await orderQuery.refetch();
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Không thể gán shipper',
+                description: getErrorMessage(error),
+            });
+        }
+    };
 
     return (
         <div className="space-y-6 p-6">
@@ -168,13 +303,15 @@ export default function TeamOrderDetailPage() {
                                 <div className="text-gray-500">Status</div>
                                 <div className="font-medium">{order.shipment.status ?? '—'}</div>
                             </div>
-                            <div>
-                                <div className="text-gray-500">Assigned</div>
-                                <div className="font-medium">
-                                    {order.shipment.assigned_name ?? '—'}
-                                    {order.shipment.assigned_phone ? ` (${order.shipment.assigned_phone})` : ''}
+                            {currentAssigneeName && (
+                                <div>
+                                    <div className="text-gray-500">Assigned</div>
+                                    <div className="font-medium">
+                                        {currentAssigneeName}
+                                        {currentAssigneePhone ? ` (${currentAssigneePhone})` : ''}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                             {order.shipment.pickup_eta && (
                                 <div>
                                     <div className="text-gray-500">Pickup ETA</div>
@@ -189,6 +326,101 @@ export default function TeamOrderDetailPage() {
                             )}
                         </div>
                     )}
+
+                    <div className="bg-white rounded-lg border shadow-sm p-4 text-sm space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <h2 className="text-base font-semibold text-gray-900">Shipper hiện tại</h2>
+                            {isAssigned && <span className="text-xs text-green-600 font-semibold uppercase">Đã gán</span>}
+                        </div>
+                        {isAssigned ? (
+                            <div className="space-y-3">
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide">Họ tên</p>
+                                    <p className="text-lg font-semibold text-gray-900">
+                                        {currentAssigneeName ?? matchedAssignee?.fullName ?? 'Không rõ'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide">Liên hệ</p>
+                                    <p className="text-sm font-medium text-gray-900">
+                                        {currentAssigneePhone ??
+                                            matchedAssignee?.phone ??
+                                            matchedAssignee?.email ??
+                                            'Không có'}
+                                    </p>
+                                </div>
+                                {matchedAssignee?.email && (
+                                    <div>
+                                        <p className="text-xs text-gray-500 uppercase tracking-wide">Email</p>
+                                        <p className="text-sm font-medium text-gray-900">{matchedAssignee.email}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500">
+                                Đơn hàng này chưa được gán shipper. Vui lòng gán ở phần bên dưới để đảm bảo đơn được xử
+                                lý kịp thời.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="bg-white rounded-lg border shadow-sm p-4 text-sm space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <h2 className="font-semibold text-gray-900 text-base">Gán shipper</h2>
+                            {membersQuery.isFetching && (
+                                <span className="text-xs text-gray-500">Đang tải danh sách...</span>
+                            )}
+                        </div>
+
+                        {order.shipment?.assigned_name && (
+                            <div className="text-sm text-gray-600">
+                                Đơn hiện đang được gán cho{' '}
+                                <span className="font-medium text-gray-900">{order.shipment.assigned_name}</span>
+                                {order.shipment.assigned_phone ? ` (${order.shipment.assigned_phone})` : ''}.
+                                Bạn có thể gán lại cho shipper khác nếu cần.
+                            </div>
+                        )}
+
+                        {!teamId ? (
+                            <p className="text-sm text-gray-500">
+                                Không tìm thấy thông tin team của đơn hàng nên không thể gán shipper.
+                            </p>
+                        ) : membersQuery.isError ? (
+                            <p className="text-sm text-red-600">
+                                Không thể tải danh sách shipper: {getErrorMessage(membersQuery.error)}
+                            </p>
+                        ) : shipperMembers.length === 0 && !membersQuery.isLoading ? (
+                            <p className="text-sm text-gray-500">
+                                Team chưa có shipper nào hoặc tất cả shipper đều không khả dụng.
+                            </p>
+                        ) : (
+                            <>
+                                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    Chọn shipper
+                                </label>
+                                <select
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    value={selectedMemberId}
+                                    onChange={(event) => setSelectedMemberId(event.target.value)}
+                                    disabled={membersQuery.isLoading || shipperMembers.length === 0}
+                                >
+                                    <option value="">Chọn shipper...</option>
+                                    {shipperMembers.map((member) => (
+                                        <option key={member.id} value={member.id}>
+                                            {member.fullName ?? member.email ?? member.id}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={handleAssignShipper}
+                                    disabled={!selectedMemberId || assignShipment.isPending}
+                                    className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 rounded-lg transition"
+                                >
+                                    {assignShipment.isPending ? 'Đang gán...' : 'Gán đơn cho shipper'}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

@@ -7,6 +7,7 @@ import {
     useTeamShipmentsControllerListMyShipments,
     getTeamShipmentsControllerListMyShipmentsQueryKey,
     useTeamShipmentsControllerAssignSelf,
+    useTeamShipmentsControllerAssignToUser,
     useTeamShipmentsControllerStartDelivery,
     useTeamShipmentsControllerMarkDelivered,
     useTeamShipmentsControllerMarkFailed,
@@ -14,6 +15,7 @@ import {
 import type {
     TeamStartDeliveryDto,
     TeamMarkFailedDto,
+    TeamAssignOrderDto,
 } from '@/lib/api/generated/models';
 
 // --- List Hooks ---
@@ -87,5 +89,49 @@ export function useMarkFailed() {
             queryClient.invalidateQueries({ queryKey: getTeamShipmentsControllerListMyShipmentsQueryKey() });
             return result;
         },
+    };
+}
+
+type AssignShipmentInput = {
+    code: string;
+    memberId?: string;
+    userId?: string;
+};
+
+export function useAssignShipmentToMember() {
+    const queryClient = useQueryClient();
+    const mutation = useTeamShipmentsControllerAssignToUser();
+
+    const assign = async ({ code, memberId, userId }: AssignShipmentInput) => {
+        if (!memberId && !userId) {
+            throw new Error('Thiếu thông tin shipper để gán đơn.');
+        }
+
+        const payload: TeamAssignOrderDto = {
+            assigneeId: userId ?? memberId,
+            assignee_id: userId ?? memberId,
+            userId,
+            user_id: userId,
+            memberId,
+            member_id: memberId,
+            teamMemberId: memberId,
+            team_member_id: memberId,
+        };
+
+        const sanitized = Object.fromEntries(
+            Object.entries(payload).filter(([, value]) => value !== undefined && value !== null),
+        ) as TeamAssignOrderDto;
+
+        const result = await mutation.mutateAsync({ code, data: sanitized });
+
+        await queryClient.invalidateQueries({ queryKey: getTeamShipmentsControllerListUnassignedQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getTeamShipmentsControllerListMyShipmentsQueryKey() });
+
+        return result;
+    };
+
+    return {
+        ...mutation,
+        assign,
     };
 }

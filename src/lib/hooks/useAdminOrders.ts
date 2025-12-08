@@ -6,6 +6,7 @@ import {
     adminOrdersControllerList,
     getAdminOrdersControllerGetQueryKey,
     getAdminOrdersControllerListQueryKey,
+    useAdminOrdersControllerDelete,
     useAdminOrdersControllerCancel,
     useAdminOrdersControllerConfirmPayment,
     useAdminOrdersControllerGet,
@@ -171,33 +172,31 @@ export function useAdminCancelOrder() {
 
 type DeleteOrderInput = {
     code: string;
+    id?: string;
 };
 
 export function useAdminDeleteOrder() {
     const queryClient = useQueryClient();
 
-    const mutation = useMutation<void, unknown, DeleteOrderInput>({
-        mutationFn: ({ code }) =>
-            customInstance({
-                url: `/api/admin/orders/${code}`,
-                method: 'DELETE',
-            }),
-        onSuccess: async (_data, variables) => {
-            const listKey = getAdminOrdersControllerListQueryKey();
-            await queryClient.invalidateQueries({
-                queryKey: listKey as unknown as QueryKey,
-                exact: false,
-            });
-
-            if (variables?.code) {
+    const mutation = useAdminOrdersControllerDelete({
+        mutation: {
+            onSuccess: async (_data, variables) => {
+                const listKey = getAdminOrdersControllerListQueryKey();
                 await queryClient.invalidateQueries({
-                    queryKey: getAdminOrdersControllerGetQueryKey(variables.code) as unknown as QueryKey,
+                    queryKey: listKey as unknown as QueryKey,
+                    exact: false,
                 });
-            }
+
+                if (variables?.id) {
+                    await queryClient.invalidateQueries({
+                        queryKey: getAdminOrdersControllerGetQueryKey(variables.id) as unknown as QueryKey,
+                    });
+                }
+            },
         },
     });
 
-    const deleteOrder = ({ code }: DeleteOrderInput) => mutation.mutateAsync({ code });
+    const deleteOrder = ({ code, id }: DeleteOrderInput) => mutation.mutateAsync({ id: id ?? code });
 
     return {
         ...mutation,
