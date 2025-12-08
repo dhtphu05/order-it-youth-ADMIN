@@ -1,7 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTeamStatisticsControllerGetMyTeamStats } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
+import {
+    useTeamStatisticsControllerGetMyTeamStats,
+    useTeamStatisticsControllerGetTeamDailyStats,
+} from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
 
 export type TeamStatsParams = {
     from: string;
@@ -35,6 +38,12 @@ type StatusEntry = {
 const SUCCESS_STATUSES = ['SUCCESS', 'COMPLETED', 'DELIVERED'];
 const FAILURE_STATUSES = ['FAILED', 'CANCELLED', 'REFUNDED'];
 
+export interface TeamDailyStatItem {
+    date: string;
+    total_orders: number;
+    revenue: number;
+}
+
 const sumStatuses = (map: Record<string, number>, statuses: string[]) => {
     let total = 0;
     for (const key of statuses) {
@@ -46,6 +55,11 @@ const sumStatuses = (map: Record<string, number>, statuses: string[]) => {
 
 export function useTeamStats(params: TeamStatsParams) {
     const statsQuery = useTeamStatisticsControllerGetMyTeamStats<TeamStatsResponse>(params, {
+        query: {
+            keepPreviousData: true,
+        },
+    });
+    const dailyQuery = useTeamStatisticsControllerGetTeamDailyStats<TeamDailyStatItem[]>(params, {
         query: {
             keepPreviousData: true,
         },
@@ -97,15 +111,32 @@ export function useTeamStats(params: TeamStatsParams) {
         .map(([status, count]) => ({ status, count }))
         .sort((a, b) => b.count - a.count);
 
+    const dailyStats =
+        (Array.isArray(dailyQuery.data)
+            ? dailyQuery.data
+            : Array.isArray((dailyQuery.data as any)?.data)
+              ? (dailyQuery.data as any).data
+              : []
+        )
+            .map((item: TeamDailyStatItem) => ({
+                date: item.date ?? new Date().toISOString(),
+                total_orders: typeof item.total_orders === 'number' ? item.total_orders : 0,
+                revenue: typeof item.revenue === 'number' ? item.revenue : 0,
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
     return {
         overview,
         teamBreakdown,
         statusBreakdown,
+        dailyStats,
         period: statsQuery.data?.period,
-        isLoading: statsQuery.isLoading,
-        isFetching: statsQuery.isFetching,
-        isError: statsQuery.isError,
-        error: statsQuery.error,
-        refetch: statsQuery.refetch,
+        isLoading: statsQuery.isLoading || dailyQuery.isLoading,
+        isFetching: statsQuery.isFetching || dailyQuery.isFetching,
+        isError: statsQuery.isError || dailyQuery.isError,
+        error: statsQuery.error ?? dailyQuery.error,
+        refetch: async () => {
+            await Promise.all([statsQuery.refetch(), dailyQuery.refetch()]);
+        },
     };
 }

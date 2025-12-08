@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 import {
     Bar,
     CartesianGrid,
@@ -63,13 +64,8 @@ export default function TeamOrdersPage() {
     const hasNextPage = page * limit < total;
     const statsLoading = statsQuery.isLoading || statsQuery.isFetching;
     const overview = statsQuery.overview;
-    const teamBreakdown = statsQuery.teamBreakdown ?? [];
+    const dailyStats = statsQuery.dailyStats ?? [];
     const statusBreakdown = statsQuery.statusBreakdown ?? [];
-    const chartData = teamBreakdown.map((team) => ({
-        name: team.name,
-        revenue: team.totalRevenue,
-        orders: team.totalOrders,
-    }));
     const successRateValue = Number.isFinite(overview.successRate) ? overview.successRate : 0;
     const statsCards = [
         {
@@ -140,22 +136,26 @@ export default function TeamOrdersPage() {
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Hiệu suất theo team</h3>
-                            <p className="text-sm text-gray-500">Doanh thu và số đơn của từng team trong khoảng thời gian.</p>
+                            <h3 className="text-lg font-semibold text-gray-900">Thống kê theo ngày</h3>
+                            <p className="text-sm text-gray-500">Doanh thu và số đơn từng ngày trong khoảng thời gian.</p>
                         </div>
                     </div>
                     {statsLoading ? (
                         <div className="h-64 flex items-center justify-center text-gray-500 text-sm">Đang tải dữ liệu...</div>
-                    ) : chartData.length === 0 ? (
+                    ) : dailyStats.length === 0 ? (
                         <div className="h-64 flex items-center justify-center text-gray-500 text-sm">
                             Không có dữ liệu trong khoảng thời gian này.
                         </div>
                     ) : (
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={chartData}>
+                                <ComposedChart data={dailyStats}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                    <XAxis dataKey="name" stroke="#6b7280" />
+                                    <XAxis
+                                        dataKey="date"
+                                        stroke="#6b7280"
+                                        tickFormatter={(value) => format(new Date(value), 'dd/MM')}
+                                    />
                                     <YAxis
                                         yAxisId="left"
                                         stroke="#6b7280"
@@ -170,9 +170,9 @@ export default function TeamOrdersPage() {
                                         tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
                                     />
                                     <Tooltip
-                                        labelFormatter={(value) => value}
+                                        labelFormatter={(value) => format(new Date(value), 'dd/MM/yyyy')}
                                         formatter={(value, name) => {
-                                            if (name === 'orders') {
+                                            if (name === 'total_orders') {
                                                 return [`${Number(value).toLocaleString('vi-VN')} đơn`, 'Đơn hàng'];
                                             }
                                             return [formatCurrency(Number(value)), 'Doanh thu'];
@@ -180,7 +180,7 @@ export default function TeamOrdersPage() {
                                     />
                                     <Bar
                                         yAxisId="left"
-                                        dataKey="orders"
+                                        dataKey="total_orders"
                                         fill="#22c55e"
                                         radius={[4, 4, 0, 0]}
                                         opacity={0.85}
