@@ -6,14 +6,15 @@ import { QuickOrderCart, type CartItem } from '@/components/pos/quick-order-cart
 import { QuickOrderForm } from '@/components/pos/quick-order-form';
 import { Container } from '@/components/ui/container';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, LogIn } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /**
- * Home Page - POS Quick Order
- * Main landing page with quick order functionality
+ * Quick Order Page (POS - Public)
+ * Allows customers to quickly create orders
+ * Flow: Select Products -> Enter Customer Info -> Submit
  */
-export default function Home() {
+export default function QuickOrderPage() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
@@ -24,18 +25,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8">
-      {/* Top Right Login Button */}
-      <div className="fixed top-4 right-4 z-50">
-        <Button
-          onClick={() => router.push('/login')}
-          className="gap-2"
-          variant="default"
-        >
-          <LogIn className="h-4 w-4" />
-          Đăng Nhập
-        </Button>
-      </div>
-
       <Container className="max-w-2xl">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">

@@ -127,7 +127,7 @@ export default function TeamOrdersPage() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 font-medium">
-                                            {order.grand_total_vnd.toLocaleString('vi-VN')} đ
+                                            {(order.grand_total_vnd || 0).toLocaleString('vi-VN')} đ
                                         </td>
                                         <td className="px-4 py-3 text-gray-500 text-xs">
                                             {/* Assuming created_at based on DTO check, or use a safe fallback */}
