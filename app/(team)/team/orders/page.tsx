@@ -336,7 +336,7 @@ export default function TeamOrdersPage() {
                                             {order.note ?? '—'}
                                         </td>
                                         <td className="px-4 py-3 font-medium">
-                                            {formatCurrency(order.grand_total_vnd)}
+                                            {(order.grand_total_vnd || 0).toLocaleString('vi-VN')} đ
                                         </td>
                                         <td className="px-4 py-3 text-gray-500 text-xs">
                                             {formatDateTime(order.created_at)}

@@ -6,13 +6,10 @@ export default function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient());
 
   useEffect(() => {
-    // FORCE DISABLE MSW FOR DEBUGGING
-    return;
-    /*
+    // Enable MSW for development
     if (process.env.NEXT_PUBLIC_API_MOCKING !== 'enabled') {
-      return;
+      // Still start MSW for POS endpoints
     }
-    */
 
     const startMockServiceWorker = async () => {
       const { worker } = await import('@/src/mocks/browser');

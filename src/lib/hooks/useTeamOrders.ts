@@ -40,6 +40,20 @@ export type TeamOrdersListParams = {
     to?: string;
 };
 
+export type OrderItem = {
+    id: string;
+    code?: string;
+    full_name?: string;
+    phone?: string;
+    payment_status: string;
+    order_status: string;
+    grand_total_vnd?: number;
+    created_at?: string;
+    items?: any[];
+    team_id?: string;
+    shipper_id?: string;
+};
+
 export type TeamOrdersListResponse = {
     data: TeamOrder[];
     total: number;
