@@ -1,13 +1,9 @@
 'use client';
-
-import { endOfDay, formatISO, startOfDay, subDays } from 'date-fns';
 import {
     useAdminStatisticsControllerGetOverallStats,
     useAdminStatisticsControllerGetTeamStats,
     useAdminStatisticsControllerGetDailyStats,
 } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
-
-type StatsRange = '7d' | '30d';
 
 export type AdminStatsParams = {
     from: string;
@@ -321,16 +317,7 @@ const mergeRevenueAndOrders = (revenuePoints: RevenuePoint[], orderPoints: Order
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
 };
 
-export function getRangeDates(range: StatsRange) {
-    const today = new Date();
-    const end = endOfDay(today);
-    const days = range === '30d' ? 29 : 6;
-    const start = startOfDay(subDays(end, days));
-    return {
-        from: formatISO(start),
-        to: formatISO(end),
-    };
-}
+export { getStatsRangeDates as getRangeDates } from '@/src/lib/utils/stats-range';
 
 export function useAdminStats(params: AdminStatsParams) {
     const queryOptions = {
