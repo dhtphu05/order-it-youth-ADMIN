@@ -26,7 +26,6 @@ import type { OrderResponseDtoOrderStatus } from "@/lib/api/generated/models/ord
 import type { OrderResponseDtoPaymentMethod } from "@/lib/api/generated/models/orderResponseDtoPaymentMethod"
 import type { OrderResponseDtoPaymentStatus } from "@/lib/api/generated/models/orderResponseDtoPaymentStatus"
 import {
-  useAdminOrdersControllerCancel,
   useAdminOrdersControllerCompleteFulfilment,
   useAdminOrdersControllerFailFulfilment,
   useAdminOrdersControllerGet,
@@ -34,7 +33,7 @@ import {
   useAdminOrdersControllerRetryFulfilment,
   useAdminOrdersControllerStartFulfilment,
 } from "@/lib/api/generated/endpoints/orderITYouthAdminAPI"
-import { useAdminConfirmPayment } from "@/src/lib/hooks/useAdminOrders"
+import { useAdminConfirmPayment, useAdminDeleteOrder } from "@/src/lib/hooks/useAdminOrders"
 
 const PAGE_SIZE = 10
 
@@ -88,6 +87,8 @@ const PAYMENT_STATUS_OPTIONS: { value: "all" | AdminOrdersControllerListPaymentS
   { value: PaymentStatusEnum.FAILED, label: "Thanh toán lỗi" },
   { value: PaymentStatusEnum.REFUNDED, label: "Đã hoàn" },
 ]
+
+const DELETABLE_STATUSES: OrderResponseDtoOrderStatus[] = ["CREATED", "PAID", "FULFILLING", "DELIVERY_FAILED"]
 
 type OrderListItem = OrderResponseDto & {
   email?: string
@@ -189,6 +190,11 @@ const getTeamName = (order?: Partial<OrderListItem>) => {
   }
 
   return undefined
+}
+
+const canDeleteOrder = (status?: OrderResponseDtoOrderStatus) => {
+  if (!status) return false
+  return DELETABLE_STATUSES.includes(status)
 }
 
 type PaginatedResponse<T> = {
@@ -319,7 +325,7 @@ export function AdminOrders() {
   const failFulfilmentMutation = useAdminOrdersControllerFailFulfilment()
   const retryFulfilmentMutation = useAdminOrdersControllerRetryFulfilment()
   const completeFulfilmentMutation = useAdminOrdersControllerCompleteFulfilment()
-  const cancelOrderMutation = useAdminOrdersControllerCancel()
+  const deleteOrderMutation = useAdminDeleteOrder()
 
   const invalidateOrders = () => {
     void refetchOrders()
@@ -462,21 +468,17 @@ export function AdminOrders() {
     }
   }
 
-  const handleCancelOrder = async () => {
+  const confirmDelete = (code: string) => {
+    return window.confirm(`Bạn có chắc chắn muốn xoá đơn ${code}? Hành động này không thể hoàn tác.`)
+  }
+
+  const handleDeleteOrder = async () => {
     if (!detail) return
-
-    const reasonPrompt = window.prompt("Lý do huỷ đơn", "Khách yêu cầu huỷ")
-    if (reasonPrompt === null) return
-
-    const trimmedReason = reasonPrompt.trim()
-    if (!trimmedReason) {
-      toast({ variant: "destructive", title: "Lý do huỷ không hợp lệ" })
-      return
-    }
+    if (!confirmDelete(detail.code)) return
 
     try {
-      await cancelOrderMutation.mutateAsync({ code: detail.code, data: { reason: trimmedReason } })
-      toast({ title: "Đã huỷ đơn hàng" })
+      await deleteOrderMutation.deleteOrder({ code: detail.code })
+      toast({ title: "Đã xoá đơn hàng" })
       invalidateOrders()
       setShowDetailModal(false)
       setSelectedOrderCode(null)
@@ -484,7 +486,23 @@ export function AdminOrders() {
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Không thể huỷ đơn hàng",
+        title: "Không thể xoá đơn hàng",
+        description: getErrorMessage(error),
+      })
+    }
+  }
+
+  const handleDeleteOrderFromList = async (order: OrderListItem) => {
+    if (!confirmDelete(order.code)) return
+
+    try {
+      await deleteOrderMutation.deleteOrder({ code: order.code })
+      toast({ title: "Đã xoá đơn hàng" })
+      invalidateOrders()
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Không thể xoá đơn hàng",
         description: getErrorMessage(error),
       })
     }
@@ -619,6 +637,15 @@ export function AdminOrders() {
                               className="mt-1 px-3 py-1 text-xs font-medium rounded-md border border-cyan-500 text-cyan-600 hover:bg-cyan-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {confirmPaymentMutation.isPending ? "Đang xác nhận..." : "Xác nhận thanh toán"}
+                            </button>
+                          )}
+                          {canDeleteOrder(order.order_status) && (
+                            <button
+                              onClick={() => handleDeleteOrderFromList(order)}
+                              disabled={deleteOrderMutation.isPending}
+                              className="mt-1 px-3 py-1 text-xs font-medium rounded-md border border-rose-500 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {deleteOrderMutation.isPending ? "Đang xoá..." : "Xoá đơn"}
                             </button>
                           )}
                         </div>
@@ -822,10 +849,10 @@ export function AdminOrders() {
                     />
                     <ActionButton
                       icon={Ban}
-                      label="Huỷ đơn"
-                      onClick={handleCancelOrder}
-                      disabled={!(detail.order_status === "CREATED" || detail.order_status === "PAID")}
-                      loading={cancelOrderMutation.isPending}
+                      label="Xoá đơn"
+                      onClick={handleDeleteOrder}
+                      disabled={!canDeleteOrder(detail.order_status)}
+                      loading={deleteOrderMutation.isPending}
                     />
                   </div>
                 </>

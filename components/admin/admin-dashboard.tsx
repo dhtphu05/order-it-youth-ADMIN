@@ -8,6 +8,7 @@ import { AdminShippers } from "./admin-shippers"
 import { AdminReports } from "./admin-reports"
 import { AdminVietQRVerification } from "./admin-vietqr-verification"
 import { AdminProducts } from "./admin-products"
+import { AdminStatistics } from "./admin-statistics"
 
 interface AdminDashboardProps {
   user: {
@@ -20,12 +21,13 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "vietqr" | "products" | "shippers" | "reports">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "statistics" | "orders" | "vietqr" | "products" | "shippers" | "reports">("overview")
 
   const tabs = [
-    { id: "overview", label: "Tổng quan", icon: Home },
+    // { id: "overview", label: "Tổng quan", icon: Home },
+    { id: "statistics", label: "Thống kê", icon: BarChart3 },
     { id: "orders", label: "Đơn hàng", icon: Package },
-    { id: "vietqr", label: "Xác nhận VietQR", icon: CreditCard },
+    // { id: "vietqr", label: "Xác nhận VietQR", icon: CreditCard },
     { id: "products", label: "Sản phẩm", icon: ShoppingBag },
     { id: "shippers", label: "Shipper", icon: Users },
     { id: "reports", label: "Báo cáo", icon: BarChart3 },
@@ -80,6 +82,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === "overview" && <AdminOverview />}
+        {activeTab === "statistics" && <AdminStatistics />}
         {activeTab === "orders" && <AdminOrders />}
         {activeTab === "vietqr" && <AdminVietQRVerification />}
         {activeTab === "products" && <AdminProducts />}

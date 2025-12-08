@@ -1,17 +1,19 @@
 'use client';
 
-import { useQueryClient, type QueryKey, type UseQueryOptions } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryKey, type UseQueryOptions } from '@tanstack/react-query';
 import {
     adminOrdersControllerGet,
     adminOrdersControllerList,
     getAdminOrdersControllerGetQueryKey,
     getAdminOrdersControllerListQueryKey,
+    useAdminOrdersControllerCancel,
     useAdminOrdersControllerConfirmPayment,
     useAdminOrdersControllerGet,
     useAdminOrdersControllerList,
 } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
 import { customInstance } from '@/lib/api/custom-instance';
 import type {
+    AdminCancelOrderDto,
     AdminConfirmPaymentDto,
     AdminOrdersControllerListParams,
     OrderItemResponseDto,
@@ -127,5 +129,78 @@ export function useAdminConfirmPayment() {
     return {
         ...mutation,
         confirmPayment,
+    };
+}
+
+type CancelOrderInput = {
+    code: string;
+    reason: string;
+};
+
+export function useAdminCancelOrder() {
+    const queryClient = useQueryClient();
+
+    const mutation = useAdminOrdersControllerCancel({
+        mutation: {
+            onSuccess: async (_data, variables) => {
+                const listKey = getAdminOrdersControllerListQueryKey();
+                await queryClient.invalidateQueries({
+                    queryKey: listKey as unknown as QueryKey,
+                    exact: false,
+                });
+
+                if (variables?.code) {
+                    await queryClient.invalidateQueries({
+                        queryKey: getAdminOrdersControllerGetQueryKey(variables.code) as unknown as QueryKey,
+                    });
+                }
+            },
+        },
+    });
+
+    const cancelOrder = ({ code, reason }: CancelOrderInput) => {
+        const payload: AdminCancelOrderDto = { reason };
+        return mutation.mutateAsync({ code, data: payload });
+    };
+
+    return {
+        ...mutation,
+        cancelOrder,
+    };
+}
+
+type DeleteOrderInput = {
+    code: string;
+};
+
+export function useAdminDeleteOrder() {
+    const queryClient = useQueryClient();
+
+    const mutation = useMutation<void, unknown, DeleteOrderInput>({
+        mutationFn: ({ code }) =>
+            customInstance({
+                url: `/api/admin/orders/${code}`,
+                method: 'DELETE',
+            }),
+        onSuccess: async (_data, variables) => {
+            const listKey = getAdminOrdersControllerListQueryKey();
+            await queryClient.invalidateQueries({
+                queryKey: listKey as unknown as QueryKey,
+                exact: false,
+            });
+
+            if (variables?.code) {
+                await queryClient.invalidateQueries({
+                    queryKey: getAdminOrdersControllerGetQueryKey(variables.code) as unknown as QueryKey,
+                });
+            }
+        },
+    });
+
+    const deleteOrder = ({ code }: DeleteOrderInput) => mutation.mutateAsync({ code });
+
+    return {
+        ...mutation,
+        deleteOrder,
     };
 }
