@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { QuickOrderCart, type CartItem } from '@/components/pos/quick-order-cart';
-import { QuickOrderForm } from '@/components/pos/quick-order-form';
+import { QuickOrderCart, type CartItem } from '@/components/quick-order/quick-order-cart';
+import { QuickOrderForm } from '@/components/quick-order/quick-order-form';
 import { Container } from '@/components/ui/container';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { QuickOrderProductGrid } from '@/components/quick-order/quick-order-product-grid';
 
 /**
  * Home Page - POS Quick Order
@@ -16,6 +17,25 @@ import { Button } from '@/components/ui/button';
 export default function Home() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  const handleAddCartItem = (item: CartItem) => {
+    setCartItems((prev) => {
+      const existingIndex = prev.findIndex((existing) =>
+        item.combo_id
+          ? existing.combo_id === item.combo_id
+          : existing.variant_id === item.variant_id && !existing.combo_id,
+      );
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + item.quantity,
+        };
+        return updated;
+      }
+      return [...prev, item];
+    });
+  };
 
   const handleOrderSuccess = (orderId: string) => {
     // Navigate to success page
@@ -57,6 +77,8 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="space-y-8">
+          <QuickOrderProductGrid onAddItem={handleAddCartItem} />
+
           {/* Cart Section */}
           <QuickOrderCart items={cartItems} onItemsChange={setCartItems} />
 

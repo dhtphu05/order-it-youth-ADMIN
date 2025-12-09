@@ -8,7 +8,7 @@ import { Container } from '@/components/ui/container';
 import { Spinner } from '@/components/ui/spinner';
 import { Check, Copy, Home, Plus } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import type { OrderResponse } from '@/src/lib/api/models/pos';
+import type { OrderResponseDto } from '@/lib/api/generated/models/orderResponseDto';
 
 /**
  * Order Success Page
@@ -19,7 +19,8 @@ export default function OrderSuccessPage() {
   const router = useRouter();
   const orderId = params.orderId as string;
 
-  const [orderData, setOrderData] = useState<OrderResponse | null>(null);
+  type LightweightOrder = Pick<OrderResponseDto, 'order_status' | 'payment_status'>;
+  const [orderData, setOrderData] = useState<LightweightOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -30,7 +31,6 @@ export default function OrderSuccessPage() {
 
     // Mock order data
     setOrderData({
-      id: orderId,
       order_status: 'CREATED',
       payment_status: 'PENDING',
     });

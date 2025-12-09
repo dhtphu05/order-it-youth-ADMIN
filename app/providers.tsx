@@ -6,9 +6,9 @@ export default function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient());
 
   useEffect(() => {
-    // Enable MSW for development
-    if (process.env.NEXT_PUBLIC_API_MOCKING !== 'enabled') {
-      // Still start MSW for POS endpoints
+    const shouldMock = process.env.NEXT_PUBLIC_API_MOCKING === 'enabled';
+    if (!shouldMock) {
+      return;
     }
 
     const startMockServiceWorker = async () => {

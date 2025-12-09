@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { usePosControllerGetTeamMembers } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
+import { useAdminTeamsControllerGet } from '@/lib/api/generated/endpoints/orderITYouthAdminAPI';
 import type { AdminTeamMemberDto } from '@/lib/api/generated/models';
 
 export type TeamMember = AdminTeamMemberDto & {
@@ -9,34 +9,20 @@ export type TeamMember = AdminTeamMemberDto & {
     status?: string | null;
 };
 
-const normalizeMembers = (payload: unknown): TeamMember[] => {
-    if (!payload) {
-        return [];
-    }
-
-    if (Array.isArray(payload)) {
-        return payload as TeamMember[];
-    }
-
-    if (Array.isArray((payload as any)?.data)) {
-        return (payload as any).data as TeamMember[];
-    }
-
-    if (Array.isArray((payload as any)?.members)) {
-        return (payload as any).members as TeamMember[];
-    }
-
-    return [];
-};
-
 export function useTeamMembers(teamId?: string) {
-    const query = usePosControllerGetTeamMembers<any>(teamId ?? '', {
+    const query = useAdminTeamsControllerGet<any>(teamId ?? '', {
         query: {
             enabled: Boolean(teamId),
         },
     });
 
-    const members = useMemo(() => normalizeMembers(query.data), [query.data]);
+    const members = useMemo<TeamMember[]>(() => {
+        const rawMembers = query.data?.members;
+        if (Array.isArray(rawMembers)) {
+            return rawMembers as TeamMember[];
+        }
+        return [];
+    }, [query.data]);
 
     return {
         ...query,

@@ -5,5 +5,5 @@
 // Existing hooks
 export { useCurrentUser } from '../useCurrentUser';
 
-// POS hooks
-export { useTeams, useTeamMembers, useCreateQuickOrder, useTeamOrders } from './usePos';
+export { useQuickOrderTeams, useQuickOrderTeamMembers, useQuickOrderCheckout } from './useQuickOrder';
+export { useStorefrontCatalog } from './useStorefrontCatalog';
