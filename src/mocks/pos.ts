@@ -14,12 +14,7 @@ export const MOCK_TEAMS = [
     id: 'team-002',
     code: 'SALES-02',
     name: 'Team Bán Hàng 2',
-  },
-  {
-    id: 'team-003',
-    code: 'RETAIL-01',
-    name: 'Team Bán Lẻ',
-  },
+  }
 ];
 
 export const MOCK_TEAM_MEMBERS: Record<string, any[]> = {
