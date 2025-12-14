@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { LogOut, Home, Package, Users, BarChart3, CreditCard, ShoppingBag } from "lucide-react"
+import { LogOut, Home, Package, Users, BarChart3, CreditCard, ShoppingBag, PiggyBank } from "lucide-react"
 import { AdminOverview } from "./admin-overview"
 import { AdminOrders } from "./admin-orders"
 import { AdminShippers } from "./admin-shippers"
@@ -9,6 +9,7 @@ import { AdminReports } from "./admin-reports"
 import { AdminVietQRVerification } from "./admin-vietqr-verification"
 import { AdminProducts } from "./admin-products"
 import { AdminStatistics } from "./admin-statistics"
+import { AdminDonations } from "./admin-donations"
 
 interface AdminDashboardProps {
   user: {
@@ -21,12 +22,13 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "statistics" | "orders" | "vietqr" | "products" | "shippers" | "reports">("statistics")
+  const [activeTab, setActiveTab] = useState<"overview" | "statistics" | "orders" | "donations" | "vietqr" | "products" | "shippers" | "reports">("statistics")
 
   const tabs = [
     // { id: "overview", label: "Tổng quan", icon: Home },
     { id: "statistics", label: "Thống kê", icon: BarChart3 },
     { id: "orders", label: "Đơn hàng", icon: Package },
+    { id: "donations", label: "Ủng hộ", icon: PiggyBank },
     // { id: "vietqr", label: "Xác nhận VietQR", icon: CreditCard },
     { id: "products", label: "Sản phẩm", icon: ShoppingBag },
     // { id: "shippers", label: "Shipper", icon: Users },
@@ -84,6 +86,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         {/* {activeTab === "overview" && <AdminOverview />} */}
         {activeTab === "statistics" && <AdminStatistics />}
         {activeTab === "orders" && <AdminOrders />}
+        {activeTab === "donations" && <AdminDonations />}
         {activeTab === "vietqr" && <AdminVietQRVerification />}
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "shippers" && <AdminShippers />}
