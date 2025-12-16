@@ -10,8 +10,19 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
+  Trash2,
 } from "lucide-react"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -29,6 +40,7 @@ import {
   type DonationPaymentStatus,
   useAdminDonationsList,
   useConfirmDonation,
+  useDeleteDonation,
 } from "@/src/lib/hooks/useAdminDonations"
 
 type StatusFilter = "ALL" | DonationPaymentStatus
@@ -93,6 +105,7 @@ export function AdminDonations() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(INITIAL_FILTERS)
   const [selectedDonation, setSelectedDonation] = useState<AdminDonation | null>(null)
+  const [donationToDelete, setDonationToDelete] = useState<AdminDonation | null>(null)
 
   const queryParams = useMemo<AdminDonationListParams>(() => {
     const params: AdminDonationListParams = {
@@ -118,6 +131,7 @@ export function AdminDonations() {
 
   const { data, isLoading, isFetching, refetch, error } = useAdminDonationsList(queryParams)
   const { confirmDonation, isPending: confirmLoading } = useConfirmDonation()
+  const { deleteDonation, isPending: deleteLoading } = useDeleteDonation()
 
   const donations: AdminDonation[] = data?.data ?? []
   const meta = data?.meta
@@ -165,6 +179,38 @@ export function AdminDonations() {
       console.error("CONFIRM DONATION ERROR", err)
       toast({
         title: "Không thể xác nhận",
+        description: "Vui lòng thử lại hoặc kiểm tra kết nối.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteDialogOpen = Boolean(donationToDelete)
+
+  const handleDeleteDialogOpenChange = (open: boolean) => {
+    if (!open && !deleteLoading) {
+      setDonationToDelete(null)
+    }
+  }
+
+  const handleDeleteDonation = async () => {
+    if (!donationToDelete) {
+      return
+    }
+
+    const donationCode = donationToDelete.donation_code
+
+    try {
+      await deleteDonation(donationToDelete.id)
+      toast({
+        title: "Đã xoá quyên góp",
+        description: `Mã ${donationCode} đã được xoá khỏi hệ thống.`,
+      })
+      setDonationToDelete(null)
+    } catch (err) {
+      console.error("DELETE DONATION ERROR", err)
+      toast({
+        title: "Không thể xoá quyên góp",
         description: "Vui lòng thử lại hoặc kiểm tra kết nối.",
         variant: "destructive",
       })
@@ -338,7 +384,7 @@ export function AdminDonations() {
                 <TableHead>Điểm PVCĐ</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Thời gian</TableHead>
-                <TableHead className="text-right"></TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -389,16 +435,28 @@ export function AdminDonations() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-cyan-200 text-cyan-700 hover:bg-cyan-50"
-                        disabled={donation.payment_status !== "PENDING" || confirmLoading}
-                        onClick={() => setSelectedDonation(donation)}
-                      >
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Xác nhận
-                      </Button>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-cyan-200 text-cyan-700 hover:bg-cyan-50"
+                          disabled={donation.payment_status !== "PENDING" || confirmLoading}
+                          onClick={() => setSelectedDonation(donation)}
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Xác nhận
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                          disabled={deleteLoading}
+                          onClick={() => setDonationToDelete(donation)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Xoá
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -521,6 +579,45 @@ export function AdminDonations() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xoá quyên góp</AlertDialogTitle>
+            <AlertDialogDescription>
+              {donationToDelete
+                ? `Bạn có chắc chắn muốn xoá mã ${donationToDelete.donation_code}? Thao tác này không thể hoàn tác.`
+                : "Không có quyên góp nào được chọn."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {donationToDelete && (
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+              <p className="font-semibold text-gray-900">{donationToDelete.student_name}</p>
+              <p className="mt-1">MSSV: {donationToDelete.mssv}</p>
+              <p className="mt-1">Số tiền: {formatCurrency(donationToDelete.amount)}</p>
+              <p className="mt-1">Trạng thái: {STATUS_LABELS[donationToDelete.payment_status]}</p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Huỷ</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 text-white hover:bg-rose-500"
+              disabled={deleteLoading || !donationToDelete}
+              onClick={(event) => {
+                event.preventDefault()
+                handleDeleteDonation()
+              }}
+            >
+              {deleteLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Xoá ngay
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

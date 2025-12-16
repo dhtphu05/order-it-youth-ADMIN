@@ -1,6 +1,6 @@
 import { setupWorker } from 'msw/browser';
 
 import { getOrderITYouthAPIMock } from '../lib/api/generated';
-import { posMockHandlers } from './pos';
+import { donationMockHandlers } from './donations';
 
-export const worker = setupWorker(...getOrderITYouthAPIMock(), ...posMockHandlers);
+export const worker = setupWorker(...getOrderITYouthAPIMock(), ...donationMockHandlers);

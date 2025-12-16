@@ -46,6 +46,11 @@ export interface ConfirmDonationResponse {
   confirmed_at: string;
 }
 
+export interface DeleteDonationResponse {
+  success: boolean;
+  message?: string;
+}
+
 const ADMIN_DONATIONS_QUERY_KEY = 'admin-donations';
 
 export const getAdminDonationsQueryKey = (params?: AdminDonationListParams) => [
@@ -86,5 +91,27 @@ export function useConfirmDonation() {
   return {
     ...mutation,
     confirmDonation: (id: string) => mutation.mutateAsync({ id }),
+  };
+}
+
+export function useDeleteDonation() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      customInstance<DeleteDonationResponse>({
+        url: `/api/admin/donations/${id}`,
+        method: 'DELETE',
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [ADMIN_DONATIONS_QUERY_KEY],
+      });
+    },
+  });
+
+  return {
+    ...mutation,
+    deleteDonation: (id: string) => mutation.mutateAsync({ id }),
   };
 }
